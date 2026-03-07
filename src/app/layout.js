@@ -8,8 +8,12 @@ export default function RootLayout({ children }) {
     <html>
       <body>
         <SessionProvider>
-          <Sidebar role="admin" />
-          {children}
+          <div className="flex">
+            <Sidebar role="admin" />
+            <main className="flex-1 p-6">
+              {children}
+            </main>
+          </div>
         </SessionProvider>
       </body>
     </html>

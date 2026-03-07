@@ -108,9 +108,7 @@ export default function LoginPage() {
 
                     {/* Google Login */}
                     <Button
-                        onClick={() => signIn("google")}
-                        className="w-full"
-                        variant="secondary"
+                        onClick={() => signIn("google", { callbackUrl: "/admin/dashboard" })}
                     >
                         Sign in with Google
                     </Button>
