@@ -1,0 +1,178 @@
+const { pool } = require("../db");
+
+exports.makePayment = async (req, res) => {
+    try {
+        const planId = req.params.id;
+        const userId = req.user.id;
+        const { payment_mode } = req.body;
+
+        // Get subscription plan
+        const plan = await pool.query(
+            "SELECT * FROM subscription_plans WHERE id=$1",
+            [planId]
+        );
+
+        if (!plan.rows[0]) {
+            return res.status(404).json({
+                success: false,
+                message: "Plan not found"
+            });
+        }
+
+        const planData = plan.rows[0];
+
+        // Get user's flat
+        const flat = await pool.query(
+            "SELECT id FROM flats WHERE user_id=$1",
+            [userId]
+        );
+
+        if (!flat.rows[0]) {
+            return res.status(404).json({
+                success: false,
+                message: "Flat not assigned to user"
+            });
+        }
+
+        const flatId = flat.rows[0].id;
+
+        // Prevent duplicate subscription in same month
+        const existing = await pool.query(
+            `SELECT * FROM monthly_subscriptions
+       WHERE flat_id=$1
+       AND month=EXTRACT(MONTH FROM CURRENT_DATE)
+       AND year=EXTRACT(YEAR FROM CURRENT_DATE)`,
+            [flatId]
+        );
+
+        if (existing.rows.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Subscription already active for this month"
+            });
+        }
+
+        // Create monthly subscription
+        const subscription = await pool.query(
+            `INSERT INTO monthly_subscriptions
+       (flat_id, plan_id, month, year, amount, status)
+       VALUES (
+        $1,
+        $2,
+        EXTRACT(MONTH FROM CURRENT_DATE),
+        EXTRACT(YEAR FROM CURRENT_DATE),
+        $3,
+        'paid'
+       )
+       RETURNING *`,
+            [flatId, planId, planData.amount]
+        );
+
+        const subscriptionId = subscription.rows[0].id;
+
+        // Create payment record
+        const transactionId = "TXN" + Date.now();
+        const payment = await pool.query(
+            `INSERT INTO payments
+       (subscription_id, amount, payment_mode,transaction_id, status)
+       VALUES ($1,$2,$3,$4,'success')
+       RETURNING *`,
+            [subscriptionId, planData.amount, payment_mode, transactionId]
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Payment successful. Subscription activated.",
+            payment: payment.rows[0],
+            subscription: subscription.rows[0]
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+
+};
+exports.getUserPayments = (async (req, res, next) => {
+
+    const result = await pool.query(`
+    SELECT p.id, p.amount, p.payment_mode, p.transaction_id,
+           p.payment_date, p.status,
+           ms.month, ms.year,
+           f.flat_number
+    FROM payments p
+    LEFT JOIN monthly_subscriptions ms ON p.subscription_id = ms.id
+    LEFT JOIN flats f ON ms.flat_id = f.id
+    WHERE f.user_id=$1
+    ORDER BY p.payment_date DESC
+  `, [req.user.id]);
+
+    res.status(200).json({
+        success: true,
+        payments: result.rows
+    });
+});
+
+exports.getAllPayments = (async (req, res, next) => {
+
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const result = await pool.query(`
+    SELECT p.id, p.amount, p.payment_mode, p.transaction_id,
+           p.payment_date, p.status,
+           ms.month, ms.year,
+           f.flat_number,
+           u.name as user_name
+    FROM payments p
+    LEFT JOIN monthly_subscriptions ms ON p.subscription_id = ms.id
+    LEFT JOIN flats f ON ms.flat_id = f.id
+    LEFT JOIN users u ON f.user_id = u.id
+    ORDER BY p.payment_date DESC
+    LIMIT $1 OFFSET $2
+  `, [limit, offset]);
+
+    res.status(200).json({
+        success: true,
+        payments: result.rows
+    });
+
+});
+
+exports.getSinglePayment = (async (req, res, next) => {
+
+    const result = await pool.query(`
+    SELECT p.*, ms.month, ms.year, f.flat_number, u.id as user_id
+    FROM payments p
+    LEFT JOIN monthly_subscriptions ms ON p.subscription_id = ms.id
+    LEFT JOIN flats f ON ms.flat_id = f.id
+    LEFT JOIN users u ON f.user_id = u.id
+    WHERE p.id=$1
+  `, [req.params.id]);
+
+    const payment = result.rows[0];
+
+    if (!payment) {
+        return res.status(404).json({
+            success: false,
+            message: "Payment not found"
+        });
+    }
+
+    if (req.user.role !== "admin" && payment.user_id !== req.user.id) {
+        return res.status(403).json({
+            success: false,
+            message: "UAccess denied"
+        });
+    }
+
+    res.status(200).json({
+        success: true,
+        payment
+    });
+
+});
