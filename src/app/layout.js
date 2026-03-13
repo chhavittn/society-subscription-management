@@ -1,21 +1,20 @@
-"use client"
-import "./globals.css"
-import { SessionProvider } from "next-auth/react"
-import Sidebar from "./components/Sidebar"
+import "./globals.css";
+import LayoutContent from "./layoutContent";
+import ReduxProvider from "./components/providers/ReduxProvider";
+import SessionWrapper from "./components/providers/SessionWrapper";
 
 export default function RootLayout({ children }) {
   return (
     <html>
       <body>
-        <SessionProvider>
-          <div className="flex">
-            <Sidebar role="admin" />
-            <main className="flex-1 p-6">
+        <SessionWrapper>
+          <ReduxProvider>
+            <LayoutContent>
               {children}
-            </main>
-          </div>
-        </SessionProvider>
+            </LayoutContent> {/* client component */}
+          </ReduxProvider>
+        </SessionWrapper>
       </body>
     </html>
-  )
+  );
 }
