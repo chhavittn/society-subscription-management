@@ -1,50 +1,63 @@
-"use client";
+"use client"
 
-import React from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { logout } from "../../redux/slices/authSlice";
-import { useRouter } from "next/navigation";
+import { useSelector, useDispatch } from "react-redux"
+import { logout } from "@/redux/slices/authSlice"
+import { useSession, signOut } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 
-const Navbar = () => {
-  const dispatch = useDispatch();
-  const router = useRouter();
+export default function Navbar() {
 
-  const { user, isAuthenticated } = useSelector((state) => state.auth);
+  const { data: session } = useSession()
+  const { user, isAuthenticated } = useSelector((state) => state.auth)
+
+  const dispatch = useDispatch()
+  const router = useRouter()
+
+  const userData = session?.user || user
 
   const handleLogout = () => {
-    dispatch(logout());
-    router.push("/login");
-  };
+
+    if (session) {
+      signOut({ callbackUrl: "/login" })
+    } else {
+      dispatch(logout())
+      router.push("/login")
+    }
+
+  }
 
   return (
-    <nav className="bg-gray-800 text-white p-4 flex justify-between items-center">
-      <div className="logo font-bold text-xl cursor-pointer" onClick={() => router.push("/")}>
-        MyApp
-      </div>
+    <nav className="flex justify-between items-center bg-gray-800 text-white px-6 py-3">
 
-      <div className="links flex items-center gap-6">
-        <a href="/" className="hover:text-gray-400">Home</a>
-        {isAuthenticated && <a href="/profile" className="hover:text-gray-400">Profile</a>}
-        {user?.role === "admin" && <a href="/admin" className="hover:text-gray-400">Dashboard</a>}
+      <h1 className="font-semibold text-lg">
+        Dashboard
+      </h1>
 
-        {isAuthenticated ? (
-          <div className="flex items-center gap-4">
-            <span className="font-medium">{user?.name}</span>
+      <div className="flex items-center gap-4">
+
+        {(session || isAuthenticated) ? (
+          <>
+            <span>{userData?.name}</span>
+
             <button
               onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded"
+              className="bg-red-500 px-3 py-1 rounded"
             >
               Logout
             </button>
-          </div>
+          </>
         ) : (
-          <a href="/login" className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded">
+          <Link
+            href="/login"
+            className="bg-blue-500 px-3 py-1 rounded"
+          >
             Login
-          </a>
+          </Link>
         )}
-      </div>
-    </nav>
-  );
-};
 
-export default Navbar;
+      </div>
+
+    </nav>
+  )
+}

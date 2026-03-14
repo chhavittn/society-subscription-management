@@ -5,13 +5,13 @@ import SessionWrapper from "./components/providers/SessionWrapper";
 
 export default function RootLayout({ children }) {
   return (
-    <html>
+    <html lang="en">
       <body>
         <SessionWrapper>
           <ReduxProvider>
             <LayoutContent>
               {children}
-            </LayoutContent> {/* client component */}
+            </LayoutContent>
           </ReduxProvider>
         </SessionWrapper>
       </body>

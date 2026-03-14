@@ -3,23 +3,36 @@
 import { useSelector } from "react-redux"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { useSession } from "next-auth/react"
+
 import AdminSidebar from "./AdminSidebar"
 import UserSidebar from "./UserSidebar"
 
 export default function Sidebar() {
 
   const router = useRouter()
+
+  const { data: session, status } = useSession()
   const { isAuthenticated, user } = useSelector((state) => state.auth)
 
+  // const role = user?.role || session?.user?.role
+  const role = user?.role || session?.user?.role || "user"
+
   useEffect(() => {
-    if (!isAuthenticated) {
+
+    if (status === "loading") return
+
+    if (!session && !isAuthenticated) {
       router.push("/login")
     }
-  }, [isAuthenticated, router])
 
-  if (!isAuthenticated) return null
+  }, [session, status, isAuthenticated, router])
 
-  if (user?.role === "admin") {
+  if (status === "loading") return null
+
+  if (!session && !isAuthenticated) return null
+
+  if (role === "admin") {
     return <AdminSidebar />
   }
 
