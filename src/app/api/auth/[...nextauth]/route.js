@@ -14,9 +14,36 @@ const handler = NextAuth({
   },
 
   callbacks: {
+
+    async signIn({ user }) {
+
+      try {
+
+        await fetch("http://localhost:5000/api/v1/google-login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            name: user.name,
+            email: user.email
+          })
+        })
+
+        return true
+
+      } catch (error) {
+
+        console.error("Google backend login failed:", error)
+        return false
+
+      }
+
+    },
+
     async jwt({ token, account }) {
 
-      // Assign role 
       if (account) {
         token.role = "admin"
       }
@@ -25,8 +52,10 @@ const handler = NextAuth({
     },
 
     async session({ session, token }) {
+
       session.user.role = token.role
       return session
+
     }
   },
 

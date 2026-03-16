@@ -19,7 +19,7 @@ export default function UserSidebar() {
           </Link>
         </li>
         <li><Link href="/user/payments">My Payments</Link></li>
-        <li><Link href="/user/profile">Profile</Link></li>
+        <li><Link href="/profile">Profile</Link></li>
       </ul>
 
     </div>

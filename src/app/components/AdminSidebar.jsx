@@ -48,7 +48,7 @@ export default function AdminSidebar() {
 
           <ul className="ml-4 space-y-2">
             <li>
-              <Link href="/admin/profile" className="hover:text-gray-300">
+              <Link href="/profile" className="hover:text-gray-300">
                 Admin Profile
               </Link>
             </li>

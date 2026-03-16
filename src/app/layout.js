@@ -2,6 +2,7 @@ import "./globals.css";
 import LayoutContent from "./layoutContent";
 import ReduxProvider from "./components/providers/ReduxProvider";
 import SessionWrapper from "./components/providers/SessionWrapper";
+import OneSignalProvider from "./components/OneSignalProvider";
 
 export default function RootLayout({ children }) {
   return (
@@ -10,6 +11,7 @@ export default function RootLayout({ children }) {
         <SessionWrapper>
           <ReduxProvider>
             <LayoutContent>
+              <OneSignalProvider />
               {children}
             </LayoutContent>
           </ReduxProvider>
