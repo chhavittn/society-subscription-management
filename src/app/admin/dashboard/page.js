@@ -1,4 +1,5 @@
 "use client"
+// want it simple as per the society subscription management, just add tailwind css...   
 import ProtectedRoute from "../../components/ProtectedRoute"
 
 import StatsCards from "./StatsCards"

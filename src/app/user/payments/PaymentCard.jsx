@@ -1,36 +1,45 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import PaymentModal from "./PaymentModal"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import PaymentModal from "./PaymentModal";
 
-export default function PaymentCard() {
+export default function PaymentCard({ plan, allowPayment, payment, refreshPayments }) {
 
-  const amount = 1500
+  if (!plan) return null;
 
   return (
-    <Card className="w-[400px]">
+    <Card>
 
       <CardHeader>
-        <CardTitle>
-          Society Subscription
-        </CardTitle>
+        <CardTitle>{plan.name}</CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-4">
 
         <p className="text-gray-600">
-          Pending Amount
+          Amount
         </p>
 
         <p className="text-3xl font-bold">
-          ₹{amount}
+          ₹{plan.amount}
         </p>
 
-        <PaymentModal amount={amount} />
+        {payment && (
+          <p className="text-green-600 font-medium">
+            ✔ Paid for {payment.month}/{payment.year}
+          </p>
+        )}
+
+        {allowPayment && (
+          <PaymentModal
+            amount={plan.amount}
+            planId={plan.id}
+            refreshPayments={refreshPayments}
+          />
+        )}
 
       </CardContent>
 
     </Card>
-  )
+  );
 }

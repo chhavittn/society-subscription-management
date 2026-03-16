@@ -1,6 +1,6 @@
 const express = require("express");
-const { registerUser, loginUser, getUserDetails,getAllUser,getSingleUser,updateUserRole, deleteUser,
-    logout, updatePassword, updateProfile
+const { registerUser, loginUser, getUserDetails, getAllUser, getSingleUser, updateUserRole, deleteUser,
+    logout, updatePassword, updateProfile, registerDevice, sendNotification, getMyNotifications, markRead
 } = require("../controllers/userController");
 const { isAuthenticatedUser, authorizeRoles } = require("../middleware/auth");
 
@@ -9,6 +9,28 @@ const router = express.Router();
 router.route("/register").post(registerUser);
 router.route("/login").post(loginUser);
 router.route("/logout").get(logout);
+
+
+router.route("/register-device").post(isAuthenticatedUser, registerDevice);
+
+router.post(
+    "/admin/send-notification",
+    isAuthenticatedUser,
+    authorizeRoles("admin"),
+    sendNotification
+);
+
+router.get(
+    "/my-notifications",
+    isAuthenticatedUser,
+    getMyNotifications
+);
+router.put(
+    "/notification/:id/read",
+    isAuthenticatedUser,
+    markRead
+);
+
 
 router.route("/me").get(isAuthenticatedUser, getUserDetails);
 

@@ -5,7 +5,7 @@ const { makePayment, getUserPayments, getSinglePayment, getAllPayments  } = requ
 
 // User
 router.post(
-  "/pay/:id",
+  "/pay",
   isAuthenticatedUser,
   makePayment
 );

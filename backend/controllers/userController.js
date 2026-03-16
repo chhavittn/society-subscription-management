@@ -3,6 +3,8 @@ const crypto = require("crypto");
 const { pool } = require("../db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { sendNotification } = require("../utils/onesignalService");
+const axios = require("axios");
 
 exports.registerUser = (async (req, res, next) => {
 
@@ -254,3 +256,174 @@ exports.deleteUser = (async (req, res, next) => {
   });
 
 });
+
+
+exports.registerDevice = (async (req, res) => {
+  const userId = req.user.id;
+  const { player_id } = req.body;
+  if (!player_id) return res.status(400).json({ success: false, message: "player_id required" });
+  await pool.query(
+    `INSERT INTO user_devices (user_id, onesignal_player_id)
+     VALUES ($1,$2)
+     ON CONFLICT DO NOTHING`,
+    [userId, player_id]
+  );
+  res.json({
+    success: true,
+    message: "Device registered"
+  });
+});
+
+
+exports.sendNotification = (async (req, res, next) => {
+  const adminId = req.user.id;
+  const { title, message, target_type, user_id, plan_id } = req.body;
+
+  if (!title || !message || !target_type) {
+    return next(new ErrorHandler("Title, message and target_type required", 400));
+  }
+  let playerIds = [];
+  // ---------- ALL USERS ----------
+  if (target_type === "all") {
+    const result = await pool.query(
+      `SELECT onesignal_player_id FROM user_devices`
+    );
+    playerIds = result.rows.map(d => d.onesignal_player_id);
+  }
+
+  // ---------- SPECIFIC USER ----------
+  else if (target_type === "user") {
+
+    if (!user_id) return next(new ErrorHandler("user_id required", 400));
+
+    const result = await pool.query(
+      `SELECT onesignal_player_id FROM user_devices WHERE user_id=$1`,
+      [user_id]
+    );
+
+    playerIds = result.rows.map(d => d.onesignal_player_id);
+  }
+
+  // ---------- PLAN USERS ----------
+  else if (target_type === "plan") {
+    if (!plan_id) return next(new ErrorHandler("plan_id required", 400));
+    const result = await pool.query(`
+      SELECT ud.onesignal_player_id
+      FROM user_devices ud
+      JOIN users u ON u.id = ud.user_id
+      JOIN flats f ON f.user_id = u.id
+      JOIN monthly_subscriptions ms ON ms.flat_id = f.id
+      WHERE ms.plan_id=$1
+    `, [plan_id]);
+
+    playerIds = result.rows.map(d => d.onesignal_player_id);
+  }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7679d4fc-5c62-451d-837b-99db36761b42', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      runId: 'pre-fix',
+      hypothesisId: 'H2',
+      location: 'backend/controllers/userController.js:320',
+      message: 'Prepared playerIds for sendNotification',
+      data: {
+        target_type,
+        user_id: user_id || null,
+        plan_id: plan_id || null,
+        playerIdsCount: playerIds.length,
+        playerIdsSample: playerIds.slice(0, 5)
+      },
+      timestamp: Date.now()
+    })
+  }).catch(() => { });
+  // #endregion
+
+  // Filter out invalid / malformed OneSignal player IDs before sending
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const validPlayerIds = playerIds.filter(id => typeof id === "string" && uuidRegex.test(id));
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7679d4fc-5c62-451d-837b-99db36761b42', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      runId: 'post-fix',
+      hypothesisId: 'H4',
+      location: 'backend/controllers/userController.js:332',
+      message: 'Filtered playerIds for valid OneSignal UUIDs before sending',
+      data: {
+        originalCount: playerIds.length,
+        filteredCount: validPlayerIds.length,
+        removedCount: playerIds.length - validPlayerIds.length,
+        originalSample: playerIds.slice(0, 5),
+        filteredSample: validPlayerIds.slice(0, 5)
+      },
+      timestamp: Date.now()
+    })
+  }).catch(() => { });
+  // #endregion
+
+  // ---------- SEND PUSH ----------
+  await sendNotification(validPlayerIds, title, message);
+
+  // ---------- SAVE TO DB ----------
+  await pool.query(
+    `INSERT INTO notifications
+     (sender_admin_id, user_id, plan_id, title, message, target_type)
+     VALUES ($1,$2,$3,$4,$5,$6)`,
+    [adminId, user_id || null, plan_id || null, title, message, target_type]
+  );
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7679d4fc-5c62-451d-837b-99db36761b42', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      runId: 'pre-fix',
+      hypothesisId: 'H3',
+      location: 'backend/controllers/userController.js:338',
+      message: 'Notification saved to DB after sending push',
+      data: {
+        adminId,
+        target_type,
+        user_id: user_id || null,
+        plan_id: plan_id || null
+      },
+      timestamp: Date.now()
+    })
+  }).catch(() => { });
+  // #endregion
+
+  res.status(200).json({
+    success: true,
+    message: "Notification sent successfully"
+  });
+
+});
+exports.getMyNotifications = async (req, res) => {
+  const userId = req.user.id;
+  const result = await pool.query(
+    `SELECT *
+     FROM notifications
+     WHERE user_id=$1 OR target_type='all'
+     ORDER BY created_at DESC`,
+    [userId]
+  );
+  res.json({
+    success: true,
+    notifications: result.rows
+  });
+
+};
+
+exports.markRead = async (req, res) => {
+  await pool.query(
+    `UPDATE notifications
+     SET is_read=TRUE
+     WHERE id=$1`,
+    [req.params.id]
+  );
+  res.json({ success: true });
+}

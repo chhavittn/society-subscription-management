@@ -15,7 +15,6 @@ export default function Sidebar() {
   const { data: session, status } = useSession()
   const { isAuthenticated, user } = useSelector((state) => state.auth)
 
-  // const role = user?.role || session?.user?.role
   const role = user?.role || session?.user?.role || "user"
 
   useEffect(() => {
