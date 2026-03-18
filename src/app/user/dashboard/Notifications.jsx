@@ -8,23 +8,8 @@ export default function Notifications({ token }) {
   const [open, setOpen] = useState(false);
 
   const getNotifications = async () => {
-    if (!token) return; 
+    if (!token) return;
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7679d4fc-5c62-451d-837b-99db36761b42', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          runId: 'ui-pre-fix',
-          hypothesisId: 'H6',
-          location: 'src/app/user/dashboard/Notifications.jsx:13',
-          message: 'getNotifications called in Notifications component',
-          data: {},
-          timestamp: Date.now()
-        })
-      }).catch(() => { });
-      // #endregion
-
       const { data } = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/my-notifications`,
         { headers: { Authorization: `Bearer ${token}` }, withCredentials: true, }
@@ -50,29 +35,53 @@ export default function Notifications({ token }) {
       console.error("Error marking notification read:", error.response?.data || error.message);
     }
   };
+  useEffect(() => {
+
+    if (!token) return;
+
+    getNotifications();
+
+    const handleNotification = (event) => {
+      console.log("📥 notification-received event triggered", event);
+
+      const { title, message } = event.detail || {};
+
+      setNotifications(prev => {
+        const updated = [
+          {
+            id: Date.now(),
+            title: title || "New Notification",
+            message: message || "",
+            is_read: false,
+          },
+          ...prev,
+        ];
+
+        console.log("🧠 Updated notifications:", updated);
+        return updated;
+      });
+
+      setTimeout(() => {
+        getNotifications();
+      }, 1000);
+    };
+
+    window.addEventListener("notification-received", handleNotification);
+
+    return () => {
+      window.removeEventListener("notification-received", handleNotification);
+    };
+
+  }, [token]);
 
   useEffect(() => {
-    getNotifications();
-    const handleNotification = () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7679d4fc-5c62-451d-837b-99db36761b42', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          runId: 'ui-pre-fix',
-          hypothesisId: 'H7',
-          location: 'src/app/user/dashboard/Notifications.jsx:43',
-          message: 'window notification-received event handler triggered, calling getNotifications',
-          data: {},
-          timestamp: Date.now()
-        })
-      }).catch(() => { });
-      // #endregion
-
+    if (!token) return;
+    const handleFocus = () => {
       getNotifications();
     };
-    window.addEventListener("notification-received", handleNotification);
-    return () => window.removeEventListener("notification-received", handleNotification);
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [token]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -90,20 +99,20 @@ export default function Notifications({ token }) {
 
       {open && (
         <div className="absolute right-0 mt-2 w-100 bg-gray-900 text-white shadow-lg rounded-md border z-50 max-h-96 overflow-y-auto">
-  {notifications.length === 0 && (
-    <p className="p-4 text-gray-400">No notifications</p>
-  )}
-  {notifications.map(n => (
-    <div
-      key={n.id}
-      className={`p-4 border-b cursor-pointer ${n.is_read ? "bg-gray-800" : "bg-gray-700"} text-white`}
-      onClick={() => markRead(n.id)}
-    >
-      <h4 className="font-semibold">{n.title}</h4>
-      <p className="text-sm">{n.message}</p>
-    </div>
-  ))}
-</div>
+          {notifications.length === 0 && (
+            <p className="p-4 text-gray-400">No notifications</p>
+          )}
+          {notifications.map(n => (
+            <div
+              key={n.id}
+              className={`p-4 border-b cursor-pointer ${n.is_read ? "bg-gray-800" : "bg-gray-700"} text-white`}
+              onClick={() => markRead(n.id)}
+            >
+              <h4 className="font-semibold">{n.title}</h4>
+              <p className="text-sm">{n.message}</p>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

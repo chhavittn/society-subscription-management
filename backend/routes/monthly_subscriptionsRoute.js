@@ -17,8 +17,8 @@ router.route("/admin/subscription").post(isAuthenticatedUser, authorizeRoles("ad
 router.route("/admin/subscription/:id").put( isAuthenticatedUser, authorizeRoles("admin"), updateSubscription);
 router.route("/admin/subscription/:id").delete(isAuthenticatedUser, authorizeRoles("admin"), deleteSubscription);
 
+router.route("/subscriptions/:month").get(isAuthenticatedUser, getSubscriptionByMonth);
 router.route("/my-subscriptions").get(isAuthenticatedUser, getUserSubscriptions);
-router.route("/my-subscriptions/:month").get(isAuthenticatedUser, getSubscriptionByMonth);
 router.route("/my-subscription/:id").get(
     isAuthenticatedUser, getSubscriptionById
 );

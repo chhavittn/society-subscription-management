@@ -17,6 +17,25 @@ export const loginUser = createAsyncThunk(
     }
   }
 );
+export const loadUser = createAsyncThunk(
+  "auth/loadUser",
+  async (_, thunkAPI) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await axios.get(`${API}/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        withCredentials: true,
+      });
+
+      return res.data; // should return user
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response?.data);
+    }
+  }
+);
 
 const token =
   typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -55,6 +74,20 @@ const authSlice = createSlice({
 
       .addCase(loginUser.rejected, (state) => {
         state.loading = false;
+      }).addCase(loadUser.pending, (state) => {
+        state.loading = true;
+      })
+
+      .addCase(loadUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.isAuthenticated = true;
+      })
+
+      .addCase(loadUser.rejected, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.isAuthenticated = false;
       });
   },
 });

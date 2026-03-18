@@ -1,7 +1,7 @@
 const { pool } = require("../db");
 
-exports.addPlan=(async (req, res, next) => {
-  const { plan_name, amount, duration_months, effective_from } = req.body;
+exports.addPlan = async (req, res, next) => {
+  const { plan_name, amount, duration_months, effective_from, description, features } = req.body;
 
   if (!plan_name || !amount || !duration_months || !effective_from) {
     return res.status(400).json({
@@ -11,13 +11,14 @@ exports.addPlan=(async (req, res, next) => {
   }
 
   const result = await pool.query(
-    `INSERT INTO subscription_plans (plan_name, amount, duration_months, effective_from)
-     VALUES ($1,$2,$3,$4) RETURNING *`,
-    [plan_name, amount, duration_months, effective_from]
+    `INSERT INTO subscription_plans 
+      (plan_name, amount, duration_months, effective_from, description, features)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [plan_name, amount, duration_months, effective_from, description || "", features || ""]
   );
 
   res.status(201).json({ success: true, plan: result.rows[0] });
-});
+};
 
 exports.getPlans=(async (req, res, next) => {
   const result = await pool.query(`SELECT * FROM subscription_plans ORDER BY id`);
@@ -38,12 +39,12 @@ exports.getPlanById=(async (req, res, next) => {
 });
 
 exports.updatePlan=(async (req, res, next) => {
-  const { plan_name, amount, duration_months, effective_from } = req.body;
+  const { plan_name, amount, duration_months, effective_from, description, features } = req.body;
   const result = await pool.query(
     `UPDATE subscription_plans
-     SET plan_name=$1, amount=$2, duration_months=$3, effective_from=$4
-     WHERE id=$5 RETURNING *`,
-    [plan_name, amount, duration_months, effective_from, req.params.id]
+     SET plan_name=$1, amount=$2, duration_months=$3, effective_from=$4, description=$5, features=$6
+     WHERE id=$7 RETURNING *`,
+    [plan_name, amount, duration_months, effective_from, description || "", features || "", req.params.id]
   );
   const plan = result.rows[0];
   if (!plan) {

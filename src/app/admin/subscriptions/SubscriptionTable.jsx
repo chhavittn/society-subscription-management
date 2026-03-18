@@ -1,87 +1,71 @@
 "use client"
 
-import { useState } from "react"
+import axios from "axios"
 import EditSubscriptionModal from "./EditSubscriptionModal"
 import SubscriptionDetailsModal from "./SubscriptionDetailsModal"
 import { Button } from "@/components/ui/button"
 
-export default function SubscriptionTable() {
+export default function SubscriptionTable({
+  plans = [],
+  fetchPlans,
+  onPlanUpdated,
+}) {
 
-  const [plans,setPlans] = useState([
-    {
-      id:1,
-      type:"1BHK",
-      amount:1200,
-      description:"Basic plan for 1BHK flats",
-      maintenance:"Water, cleaning, security",
-      parking:"1 slot",
-      support:"Email Support"
-    },
-    {
-      id:2,
-      type:"2BHK",
-      amount:1500,
-      description:"Standard plan for 2BHK flats",
-      maintenance:"Water, cleaning, security, lift",
-      parking:"1 slot",
-      support:"Priority Support"
-    },
-    {
-      id:3,
-      type:"3BHK",
-      amount:1800,
-      description:"Premium plan for 3BHK flats",
-      maintenance:"All services included",
-      parking:"2 slots",
-      support:"24/7 Priority Support"
+  // Delete a plan
+  const deletePlan = async (id) => {
+    if (!confirm("Delete this plan?")) return
+
+    try {
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/plan/${id}`,
+        { withCredentials: true }
+      )
+      await fetchPlans?.() // Refresh table after deletion
+    } catch (error) {
+      console.log(error)
+      alert("Delete failed")
     }
-  ])
+  }
 
   return (
-
-    <div className="border rounded-lg overflow-hidden">
-
-      <table className="w-full">
-
-        <thead className="bg-gray-100">
-
-          <tr>
-            <th className="p-3 text-left">Flat Type</th>
-            <th className="p-3 text-left">Monthly Amount</th>
-            <th className="p-3 text-left">Actions</th>
-          </tr>
-
-        </thead>
-
-        <tbody>
-
-          {plans.map(plan => (
-
-            <tr key={plan.id} className="border-t">
-
-              <td className="p-3">{plan.type}</td>
-
-              <td className="p-3">
-                ₹{plan.amount}/month
-              </td>
-
-              <td className="p-3 flex gap-2">
-
-                <SubscriptionDetailsModal plan={plan} />
-
-                <EditSubscriptionModal plan={plan} />
-
-              </td>
-
+    <div className="space-y-4">
+      {/* Plans Table */}
+      <div className="border rounded-lg overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="p-3 text-left">Plan Name</th>
+              <th className="p-3 text-left">Amount</th>
+              <th className="p-3 text-left">Duration</th>
+              <th className="p-3 text-left">Actions</th>
             </tr>
-
-          ))}
-
-        </tbody>
-
-      </table>
-
+          </thead>
+          <tbody>
+            {plans.map((plan, index) => (
+              <tr key={plan.id || index} className="border-t">
+                <td className="p-3">{plan.plan_name}</td>
+                <td className="p-3">₹{plan.amount}</td>
+                <td className="p-3">{plan.duration_months} months</td>
+                <td className="p-3 flex gap-2">
+                  <SubscriptionDetailsModal plan={plan} />
+                  <EditSubscriptionModal
+                    plan={plan}
+                    onUpdated={(p) => {
+                      // #region agent log
+                      fetch('http://127.0.0.1:7242/ingest/7679d4fc-5c62-451d-837b-99db36761b42',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({runId:'post-fix',hypothesisId:'H1',location:'src/app/admin/subscriptions/SubscriptionTable.jsx:onUpdated',message:'EditSubscriptionModal onUpdated (table)',data:{updatedPlanId:p?.id??null,updatedPlanName:p?.plan_name??null},timestamp:Date.now()})}).catch(()=>{});
+                      // #endregion
+                      onPlanUpdated?.(p, true)
+                    }}
+                  />
+                  <Button size="sm" variant="destructive" onClick={() => deletePlan(plan.id)}>
+                    Delete
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
-
   )
 }

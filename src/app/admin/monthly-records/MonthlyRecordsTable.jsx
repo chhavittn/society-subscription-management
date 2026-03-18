@@ -1,102 +1,136 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
+import axios from "axios"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-export default function MonthlyRecordsTable() {
+export default function MonthlyRecordsTable({ month }) {
 
-  const [records,setRecords] = useState([
-    {
-      id:1,
-      flat:"A-101",
-      owner:"Rahul Sharma",
-      status:"paid"
-    },
-    {
-      id:2,
-      flat:"A-102",
-      owner:"Priya Singh",
-      status:"pending"
-    },
-    {
-      id:3,
-      flat:"B-201",
-      owner:"Amit Kumar",
-      status:"pending"
+  const [records, setRecords] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const fetchRecords = useCallback(async () => {
+    if (!month) return
+
+    try {
+      setLoading(true)
+
+      const { data } = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/${month}`,
+        { withCredentials: true }
+      )
+
+      console.log("API RESPONSE:", data)
+
+      // ✅ correct handling
+      setRecords(data.subscriptions || [])
+
+    } catch (error) {
+      console.log("Error fetching records:", error)
+    } finally {
+      setLoading(false)
     }
-  ])
+  }, [month])
 
-  const markAsPaid = (id) => {
+  useEffect(() => {
+    fetchRecords()
+  }, [fetchRecords])
 
-    const updated = records.map(record => {
-      if(record.id === id){
-        return {...record,status:"paid"}
-      }
-      return record
-    })
+  const markAsPaid = async (id) => {
+    try {
+      const record = records.find(r => r.id === id)
+      if (!record) return
 
-    setRecords(updated)
+      await axios.put(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/subscription/${id}`,
+        {
+          plan_id: record.plan_id,
+          amount: record.amount,
+          status: "paid",
+          due_date: record.due_date
+        },
+        { withCredentials: true }
+      )
+
+      setRecords(prev =>
+        prev.map(r =>
+          r.id === id ? { ...r, status: "paid" } : r
+        )
+      )
+
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const getStatusBadge = (status) => {
+    const s = status?.trim().toLowerCase()
+
+    if (s === "paid") return <Badge>Paid</Badge>
+    if (s === "overdue") return <Badge variant="destructive">Overdue</Badge>
+    return <Badge variant="secondary">Pending</Badge>
   }
 
   return (
+    <div className="space-y-6">
 
-    <table className="w-full border rounded">
+      {loading && <p>Loading records...</p>}
 
-      <thead className="bg-gray-100">
+      {!loading && month && records.length === 0 && (
+        <p>No records found for this month.</p>
+      )}
 
-        <tr>
-          <th className="p-3 text-left">Flat</th>
-          <th className="p-3 text-left">Owner</th>
-          <th className="p-3 text-left">Status</th>
-          <th className="p-3 text-left">Action</th>
-        </tr>
+      {!loading && records.length > 0 && (
+        <table className="w-full border rounded">
 
-      </thead>
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="p-3 text-left">Flat</th>
+              <th className="p-3 text-left">Owner</th>
+              <th className="p-3 text-left">Status</th>
+              <th className="p-3 text-left">Action</th>
+            </tr>
+          </thead>
 
-      <tbody>
+          <tbody>
+            {records.map(record => {
+              const status = record.status?.trim().toLowerCase()
 
-        {records.map(record => (
+              return (
+                <tr key={record.id} className="border-t">
 
-          <tr key={record.id} className="border-t">
+                  <td className="p-3">
+                    {record.flat_number} ({record.block})
+                  </td>
 
-            <td className="p-3">{record.flat}</td>
+                  <td className="p-3">
+                    {record.user_name}
+                  </td>
 
-            <td className="p-3">{record.owner}</td>
+                  <td className="p-3">
+                    {getStatusBadge(record.status)}
+                  </td>
 
-            <td className="p-3">
+                  <td className="p-3">
+                    {["pending", "overdue"].includes(status) && (
+                      <Button
+                        size="sm"
+                        onClick={() => markAsPaid(record.id)}
+                      >
+                        Mark Paid
+                      </Button>
+                    )}
+                  </td>
 
-              {record.status === "paid" ? (
-                <Badge>Paid</Badge>
-              ) : (
-                <Badge variant="destructive">
-                  Pending
-                </Badge>
-              )}
+                </tr>
+              )
+            })}
+          </tbody>
 
-            </td>
+        </table>
+      )}
 
-            <td className="p-3">
-
-              {record.status === "pending" && (
-
-                <Button
-                  size="sm"
-                  onClick={()=>markAsPaid(record.id)}
-                >
-                  Mark Paid
-                </Button>
-
-              )}
-
-            </td>
-
-          </tr>
-
-        ))}
-
-      </tbody>
-
-    </table>
+    </div>
   )
 }

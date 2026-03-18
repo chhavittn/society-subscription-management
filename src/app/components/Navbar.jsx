@@ -6,6 +6,7 @@ import { useSession, signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Notifications from "../user/dashboard/Notifications";
+import { loadUser } from "../../redux/slices/authSlice";
 
 export default function Navbar() {
   const { data: session, status } = useSession()
@@ -14,15 +15,25 @@ export default function Navbar() {
   const router = useRouter()
   const [token, setToken] = useState(null);
 
+
   useEffect(() => {
     const t = localStorage.getItem("token");
     setToken(t);
   }, []);
 
+
+
+  useEffect(() => {
+    if (!user && token) {
+      dispatch(loadUser());
+    }
+  }, [dispatch, user, token]);
+
+  
   if (status === "loading") return null
 
-  const userData = session?.user || user
-  console.log(session?.user, user, userData);
+  const userData = session?.user || user || {};
+  // console.log(session?.user, user, userData);
 
   const handleLogout = () => {
     if (session) {

@@ -11,64 +11,73 @@ export default function FlatsTable() {
   const [search, setSearch] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [totalPages, setTotalPages] = useState(1)
   const [editingFlat, setEditingFlat] = useState(null)
 
-  // Fetch flats from backend
-  useEffect(() => {
-    const fetchFlats = async () => {
-      try {
-        const res = await axios.get("http://localhost:5000/api/v1/flats", {
-          withCredentials: true,
-        })
-        setFlats(res.data.flats)
-        setLoading(false)
-      } catch (error) {
-        console.log(error)
-        setLoading(false)
-      }
+  const fetchFlats = async (page = currentPage, limit = rowsPerPage, searchTerm = search) => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:5000/api/v1/flats", {
+        withCredentials: true, 
+        headers: {
+          Authorization: `Bearer ${token}`,  
+        },
+        params: {
+          page,
+          limit,
+          search: searchTerm,
+        },
+      })
+
+      setFlats(res.data.flats || [])
+      setCurrentPage(res.data.page || page)
+      setRowsPerPage(res.data.limit || limit)
+      setTotalPages(res.data.totalPages || 1)
+    } catch (error) {
+      console.log(error)
+      alert(error.response?.data?.message || "Failed to load flats")
+    } finally {
+      setLoading(false)
     }
+  }
+
+  // Fetch flats from backend whenever pagination or search changes
+  useEffect(() => {
     fetchFlats()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, rowsPerPage, search])
 
   // Delete a flat
   const handleDelete = async (id) => {
     if (!confirm("Are you sure you want to delete this flat?")) return
     try {
+      const token = localStorage.getItem("token");
       await axios.delete(`http://localhost:5000/api/v1/admin/flat/${id}`, {
         withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       })
-      setFlats(prev => prev.filter(f => f.id !== id))
-      alert("Flat deleted successfully")
+      // After delete, if current page might be empty, try to stay on a sensible page
+      await fetchFlats()
+      if (flats.length === 1 && currentPage > 1) {
+        // We just deleted the last item on this page; go back one page
+        setCurrentPage(prev => prev - 1)
+      } else {
+        alert("Flat deleted successfully")
+      }
     } catch (error) {
       console.log(error)
       alert(error.response?.data?.message || "Failed to delete flat")
     }
   }
 
-  // Update flat in state after editing
-  const handleUpdateFlat = (updatedFlat) => {
-    setFlats(prev =>
-      prev.map(f => (f.id === updatedFlat.id ? updatedFlat : f))
-    )
+  const handleFlatCreatedOrUpdated = async () => {
+    // Refetch current page so row stays in place according to backend sort
+    await fetchFlats()
     setEditingFlat(null)
   }
-
-  // Filtering
-  const filteredFlats = flats.filter(f =>
-    f.user_name?.toLowerCase().includes(search.toLowerCase())
-  )
-
-  // Pagination calculations
-  const totalPages = Math.max(1, Math.ceil(filteredFlats.length / rowsPerPage))
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
-    }
-  }, [totalPages])
-
-  const startIndex = (currentPage - 1) * rowsPerPage
-  const paginatedFlats = filteredFlats.slice(startIndex, startIndex + rowsPerPage)
 
   if (loading) return <p>Loading flats...</p>
 
@@ -80,9 +89,12 @@ export default function FlatsTable() {
           placeholder="Search owner..."
           className="border p-2 rounded w-64"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setCurrentPage(1)
+          }}
         />
-        <FlatFormModal setFlats={setFlats} />
+        <FlatFormModal mode="add" onCreated={handleFlatCreatedOrUpdated} />
       </div>
 
       {/* Flats Table */}
@@ -99,7 +111,7 @@ export default function FlatsTable() {
               </tr>
             </thead>
             <tbody>
-              {paginatedFlats.map(flat => (
+              {flats.map(flat => (
                 <tr key={flat.id} className="border-t">
                   <td className="p-3">{flat.flat_number}</td>
                   <td className="p-3">{flat.user_name || "Unassigned"}</td>
@@ -158,8 +170,9 @@ export default function FlatsTable() {
       {/* Edit Modal */}
       {editingFlat && (
         <FlatFormModal
-          setFlats={handleUpdateFlat}
+          mode="edit"
           existingFlat={editingFlat}
+          onUpdated={handleFlatCreatedOrUpdated}
           onClose={() => setEditingFlat(null)}
         />
       )}

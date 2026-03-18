@@ -6,24 +6,48 @@ const jwt = require("jsonwebtoken");
 const { sendNotification } = require("../utils/onesignalService");
 const axios = require("axios");
 
-exports.registerUser = (async (req, res, next) => {
+exports.registerUser = async (req, res, next) => {
+  try {
+    const { name, email, phone } = req.body;
 
-  const { name, email, password, phone } = req.body;
+    const defaultPassword = "123456";
+    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+    // Check if user already exists
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email=$1",
+      [email]
+    );
 
-  const result = await pool.query(
-    `INSERT INTO users (name,email,password,phone)
-     VALUES ($1,$2,$3,$4)
-     RETURNING id,name,email,role`,
-    [name, email, hashedPassword, phone]
-  );
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "User already exists with this email",
+      });
+    }
 
-  const user = result.rows[0];
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password, phone)
+       VALUES ($1,$2,$3,$4)
+       RETURNING id, name, email, role`,
+      [name, email, hashedPassword, phone || null]
+    );
 
-  sendToken(user, 201, res);
+    res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      user: result.rows[0],
+      defaultPassword, // optional (for admin reference)
+    });
 
-});
+  } catch (error) {
+    console.log("🔥 REGISTER ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 exports.loginUser = (async (req, res, next) => {
 
   const { email, password } = req.body;
@@ -318,55 +342,8 @@ exports.sendNotification = (async (req, res, next) => {
 
     playerIds = result.rows.map(d => d.onesignal_player_id);
   }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7679d4fc-5c62-451d-837b-99db36761b42', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      runId: 'pre-fix',
-      hypothesisId: 'H2',
-      location: 'backend/controllers/userController.js:320',
-      message: 'Prepared playerIds for sendNotification',
-      data: {
-        target_type,
-        user_id: user_id || null,
-        plan_id: plan_id || null,
-        playerIdsCount: playerIds.length,
-        playerIdsSample: playerIds.slice(0, 5)
-      },
-      timestamp: Date.now()
-    })
-  }).catch(() => { });
-  // #endregion
-
-  // Filter out invalid / malformed OneSignal player IDs before sending
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const validPlayerIds = playerIds.filter(id => typeof id === "string" && uuidRegex.test(id));
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7679d4fc-5c62-451d-837b-99db36761b42', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      runId: 'post-fix',
-      hypothesisId: 'H4',
-      location: 'backend/controllers/userController.js:332',
-      message: 'Filtered playerIds for valid OneSignal UUIDs before sending',
-      data: {
-        originalCount: playerIds.length,
-        filteredCount: validPlayerIds.length,
-        removedCount: playerIds.length - validPlayerIds.length,
-        originalSample: playerIds.slice(0, 5),
-        filteredSample: validPlayerIds.slice(0, 5)
-      },
-      timestamp: Date.now()
-    })
-  }).catch(() => { });
-  // #endregion
-
   // ---------- SEND PUSH ----------
-  await sendNotification(validPlayerIds, title, message);
+  await sendNotification(playerIds, title, message);
 
   // ---------- SAVE TO DB ----------
   await pool.query(
@@ -375,26 +352,6 @@ exports.sendNotification = (async (req, res, next) => {
      VALUES ($1,$2,$3,$4,$5,$6)`,
     [adminId, user_id || null, plan_id || null, title, message, target_type]
   );
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7679d4fc-5c62-451d-837b-99db36761b42', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      runId: 'pre-fix',
-      hypothesisId: 'H3',
-      location: 'backend/controllers/userController.js:338',
-      message: 'Notification saved to DB after sending push',
-      data: {
-        adminId,
-        target_type,
-        user_id: user_id || null,
-        plan_id: plan_id || null
-      },
-      timestamp: Date.now()
-    })
-  }).catch(() => { });
-  // #endregion
 
   res.status(200).json({
     success: true,

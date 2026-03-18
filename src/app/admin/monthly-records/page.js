@@ -1,16 +1,24 @@
+"use client"
+
+import { useState } from "react"
 import MonthlyRecordsTable from "./MonthlyRecordsTable"
 import MonthSelector from "./MonthSelector"
+
 export default function MonthlyRecordsPage() {
-    return (
-        <div className="space-y-6">
+  const [month, setMonth] = useState("")
 
-            <h1 className="text-3xl font-bold">
-                Monthly Subscription Records
-            </h1>
-            <MonthSelector />
+  return (
+    <div className="space-y-6">
 
-            <MonthlyRecordsTable />
+      <h1 className="text-3xl font-bold">
+        Monthly Subscription Records
+      </h1>
 
-        </div>
-    )
+      {/* ✅ ONLY ONE SELECT HERE */}
+      <MonthSelector value={month} onChange={setMonth} />
+
+      <MonthlyRecordsTable month={month} />
+
+    </div>
+  )
 }
