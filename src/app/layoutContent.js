@@ -13,7 +13,7 @@ export default function LayoutContent({ children }) {
     pathname === "/register";
 
   return (
-    <div className="flex">
+    <div className="flex w-full">
 
       {!hideLayout && <Sidebar />}
 

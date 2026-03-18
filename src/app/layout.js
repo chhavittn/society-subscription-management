@@ -8,14 +8,12 @@ import Script from "next/script";
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-
-      <head>
+            <head>
         <Script
           src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
           strategy="beforeInteractive"
         />
       </head>
-
       <body>
         <SessionWrapper>
           <ReduxProvider>
@@ -26,7 +24,6 @@ export default function RootLayout({ children }) {
           </ReduxProvider>
         </SessionWrapper>
       </body>
-
     </html>
   );
 }

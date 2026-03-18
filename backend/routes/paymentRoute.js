@@ -10,6 +10,15 @@ router.post(
   makePayment
 );
 
+
+// Admin
+router.get(
+  "/admin/payments",
+  isAuthenticatedUser,
+  authorizeRoles("admin"),
+  getAllPayments
+);
+
 router.get(
   "/my-payments",
   isAuthenticatedUser,
@@ -22,12 +31,5 @@ router.get(
  getSinglePayment
 );
 
-// Admin
-router.get(
-  "/admin/payments",
-  isAuthenticatedUser,
-  authorizeRoles("admin"),
-  getAllPayments
-);
 
 module.exports = router;
