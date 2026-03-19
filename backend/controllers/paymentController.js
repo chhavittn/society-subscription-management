@@ -329,3 +329,74 @@ exports.getSinglePayment = (async (req, res, next) => {
     });
 
 });
+
+
+// controllers/reportsController.js
+exports.getReports = async (req, res, next) => {
+  try {
+    // Fetch all payments and flats
+    const paymentsResult = await pool.query("SELECT * FROM payments");
+    const flatsResult = await pool.query("SELECT * FROM flats");
+
+    const payments = paymentsResult.rows;
+    const flats = flatsResult.rows;
+
+    const today = new Date();
+
+    let totalCollection = 0;
+    let pendingAmount = 0;
+    let expectedRevenue = 0;
+    let overduePayments = [];
+    let defaultersSet = new Set();
+
+    const paidFlatsSet = new Set();
+
+    // Loop through payments and calculate correctly
+    payments.forEach(p => {
+      // Ensure amount is a number
+      const amt = parseFloat(p.amount) || 0;
+      expectedRevenue += amt;
+
+      // Status may be string or boolean
+      const isPaid = p.status === "paid" || p.is_paid === true;
+
+      if (isPaid) {
+        totalCollection += amt;
+        if (p.flat_id) paidFlatsSet.add(p.flat_id);
+      } else {
+        pendingAmount += amt;
+
+        const paymentDate = new Date(p.payment_date);
+        if (paymentDate < today) {
+          overduePayments.push(p);
+          if (p.flat_id) defaultersSet.add(p.flat_id);
+        }
+      }
+    });
+
+    const collectionEfficiency =
+      expectedRevenue > 0 ? Math.round((totalCollection / expectedRevenue) * 100) : 0;
+
+    // Flats metrics
+    const totalFlats = flats.length;
+    const occupiedFlats = flats.filter(f => f.is_active).length;
+    const vacantFlats = totalFlats - occupiedFlats;
+
+    res.status(200).json({
+      success: true,
+      stats: {
+        totalCollection,
+        expectedRevenue,
+        collectionEfficiency,
+        pendingAmount,
+        overduePayments: overduePayments.length,
+        defaulters: defaultersSet.size,
+        occupiedFlats,
+        vacantFlats,
+      },
+    });
+  } catch (error) {
+    console.error("Error generating reports:", error);
+    res.status(500).json({ success: false, message: "Failed to generate reports" });
+  }
+};

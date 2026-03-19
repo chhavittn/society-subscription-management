@@ -1,5 +1,5 @@
 import ReportsSummary from "./ReportsSummary"
-import PaymentModeChart from "./PaymentModeChart"
+import { PaymentModeChart, RevenueOverTimeChart } from "./PaymentModeChart"
 import DownloadButtons from "./DownloadButtons"
 
 export default function ReportsPage() {
@@ -11,8 +11,8 @@ export default function ReportsPage() {
       </h1>
 
       <ReportsSummary />
-
       <PaymentModeChart />
+      <RevenueOverTimeChart />
 
       <DownloadButtons />
 
