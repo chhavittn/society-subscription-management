@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 const { isAuthenticatedUser, authorizeRoles } = require("../middleware/auth");
 const { getAllSubscriptions, getSubscriptionById, addSubscription, updateSubscription, deleteSubscription,
-    getUserSubscriptions, getSubscriptionByMonth 
+    getUserSubscriptions, getSubscriptionByMonth, 
+    getSubscriptionsByMonthAdmin
 } = require("../controllers/monthly_subscriptionsController");
 
 
@@ -17,6 +18,9 @@ router.route("/admin/subscription").post(isAuthenticatedUser, authorizeRoles("ad
 router.route("/admin/subscription/:id").put( isAuthenticatedUser, authorizeRoles("admin"), updateSubscription);
 router.route("/admin/subscription/:id").delete(isAuthenticatedUser, authorizeRoles("admin"), deleteSubscription);
 
+
+
+router.route("/admin/subscriptions/:month").get(isAuthenticatedUser, authorizeRoles("admin"), getSubscriptionsByMonthAdmin);
 router.route("/subscriptions/:month").get(isAuthenticatedUser, getSubscriptionByMonth);
 router.route("/my-subscriptions").get(isAuthenticatedUser, getUserSubscriptions);
 router.route("/my-subscription/:id").get(

@@ -17,8 +17,6 @@ export default function MonthlyRecordsPage() {
       {/* ✅ ONLY ONE SELECT HERE */}
       <MonthSelector value={month} onChange={setMonth} />
 
-      <MonthlyRecordsTable month={month} />
-
     </div>
   )
 }

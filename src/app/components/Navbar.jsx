@@ -21,28 +21,23 @@ export default function Navbar() {
     setToken(t);
   }, []);
 
-
-
   useEffect(() => {
     if (!user && token) {
       dispatch(loadUser());
     }
   }, [dispatch, user, token]);
 
-  
+
   if (status === "loading") return null
 
   const userData = session?.user || user || {};
   // console.log(session?.user, user, userData);
 
-  const handleLogout = () => {
-    if (session) {
-      signOut({ callbackUrl: "/login" })
-    } else {
-      dispatch(logout())
-      router.push("/login")
-    }
-  }
+
+  const handleLogout = async () => {
+    dispatch(logout());
+    await signOut({ callbackUrl: "/login" });
+  };
 
   return (
     <nav className="flex justify-between items-center bg-gray-900 text-white px-6 py-3 shadow">

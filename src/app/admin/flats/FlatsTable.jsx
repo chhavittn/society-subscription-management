@@ -4,6 +4,14 @@ import { useState, useEffect } from "react"
 import axios from "axios"
 import { Button } from "@/components/ui/button"
 import FlatFormModal from "./FlatFormModal"
+import toast from "react-hot-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function FlatsTable() {
   const [flats, setFlats] = useState([])
@@ -13,20 +21,27 @@ export default function FlatsTable() {
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [totalPages, setTotalPages] = useState(1)
   const [editingFlat, setEditingFlat] = useState(null)
+  const [deleteId, setDeleteId] = useState(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortBy, setSortBy] = useState("flat_number");
+  const [sortOrder, setSortOrder] = useState("asc");
+
 
   const fetchFlats = async (page = currentPage, limit = rowsPerPage, searchTerm = search) => {
     setLoading(true)
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get("http://localhost:5000/api/v1/flats", {
-        withCredentials: true, 
+        withCredentials: true,
         headers: {
-          Authorization: `Bearer ${token}`,  
+          Authorization: `Bearer ${token}`,
         },
         params: {
           page,
           limit,
           search: searchTerm,
+          sortBy,
+          sortOrder,
         },
       })
 
@@ -36,45 +51,67 @@ export default function FlatsTable() {
       setTotalPages(res.data.totalPages || 1)
     } catch (error) {
       console.log(error)
-      alert(error.response?.data?.message || "Failed to load flats")
+      toast.error(error.response?.data?.message || "Failed to load flats")
     } finally {
       setLoading(false)
     }
   }
 
-  // Fetch flats from backend whenever pagination or search changes
   useEffect(() => {
-    fetchFlats()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, rowsPerPage, search])
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 500); // delay (ms)
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+
+  useEffect(() => {
+    fetchFlats(currentPage, rowsPerPage, debouncedSearch);
+  }, [currentPage, rowsPerPage, debouncedSearch, sortBy, sortOrder]);
+
+
 
   // Delete a flat
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this flat?")) return
+    const toastId = toast.loading("Deleting flat...");
+
     try {
       const token = localStorage.getItem("token");
+
       await axios.delete(`http://localhost:5000/api/v1/admin/flat/${id}`, {
         withCredentials: true,
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${token}`,
         },
-      })
-      // After delete, if current page might be empty, try to stay on a sensible page
-      await fetchFlats()
-      if (flats.length === 1 && currentPage > 1) {
-        // We just deleted the last item on this page; go back one page
-        setCurrentPage(prev => prev - 1)
+      });
+
+      // 👇 Check BEFORE fetching
+      const isLastItemOnPage = flats.length === 1 && currentPage > 1;
+
+      if (isLastItemOnPage) {
+        setCurrentPage((prev) => prev - 1);
       } else {
-        alert("Flat deleted successfully")
+        await fetchFlats();
       }
+
+      toast.success("Flat deleted successfully", { id: toastId });
+
     } catch (error) {
-      console.log(error)
-      alert(error.response?.data?.message || "Failed to delete flat")
+      console.log(error);
+
+      toast.error(
+        error.response?.data?.message || "Failed to delete flat",
+        { id: toastId }
+      );
     }
-  }
+    finally {
+      setDeleteId(null);
+    }
+  };
 
   const handleFlatCreatedOrUpdated = async () => {
-    // Refetch current page so row stays in place according to backend sort
     await fetchFlats()
     setEditingFlat(null)
   }
@@ -91,10 +128,30 @@ export default function FlatsTable() {
           value={search}
           onChange={(e) => {
             setSearch(e.target.value)
-            setCurrentPage(1)
           }}
         />
         <FlatFormModal mode="add" onCreated={handleFlatCreatedOrUpdated} />
+      </div>
+      {/* Sort Field */}
+      <div>
+        <select
+          className="border p-2 rounded"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+        >
+          <option value="flat_number">Flat</option>
+          <option value="user_name">Owner</option>
+        </select>
+
+        {/* Sort Order Button */}
+        <Button
+          variant="outline"
+          onClick={() =>
+            setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))
+          }
+        >
+          {sortOrder === "asc" ? "⬆️ Asc" : "⬇️ Desc"}
+        </Button>
       </div>
 
       {/* Flats Table */}
@@ -118,8 +175,13 @@ export default function FlatsTable() {
                   <td className="p-3">{flat.user_email || "-"}</td>
                   <td className="p-3">{flat.user_phone || "-"}</td>
                   <td className="p-3 space-x-2">
-                    <Button size="sm" onClick={() => setEditingFlat(flat)}>Edit</Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleDelete(flat.id)}>Delete</Button>
+                    <Button size="sm" onClick={() => setEditingFlat(flat)}>Edit</Button><Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setDeleteId(flat.id)}
+                    >
+                      Delete
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -168,14 +230,36 @@ export default function FlatsTable() {
       </div>
 
       {/* Edit Modal */}
-      {editingFlat && (
-        <FlatFormModal
-          mode="edit"
-          existingFlat={editingFlat}
-          onUpdated={handleFlatCreatedOrUpdated}
-          onClose={() => setEditingFlat(null)}
-        />
-      )}
-    </div>
+      {
+        editingFlat && (
+          <FlatFormModal
+            mode="edit"
+            existingFlat={editingFlat}
+            onUpdated={handleFlatCreatedOrUpdated}
+            onClose={() => setEditingFlat(null)}
+          />
+        )
+      }
+      <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <DialogContent className="w-full max-w-md rounded-2xl p-6 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-red-600">
+              Delete Flat?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="outline" onClick={() => setDeleteId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleDelete(deleteId)}
+            >
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div >
   )
 }

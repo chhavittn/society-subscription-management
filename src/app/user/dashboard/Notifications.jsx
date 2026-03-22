@@ -102,7 +102,7 @@ export default function Notifications({ token }) {
           {notifications.length === 0 && (
             <p className="p-4 text-gray-400">No notifications</p>
           )}
-          {notifications.map(n => (
+          {/* {notifications.map(n => (
             <div
               key={n.id}
               className={`p-4 border-b cursor-pointer ${n.is_read ? "bg-gray-800" : "bg-gray-700"} text-white`}
@@ -110,6 +110,27 @@ export default function Notifications({ token }) {
             >
               <h4 className="font-semibold">{n.title}</h4>
               <p className="text-sm">{n.message}</p>
+            </div>
+          ))} */}
+          {notifications.map(n => (
+            <div
+              key={n.id}
+              className={`p-4 border-b bg-gray-700 text-white flex justify-between items-center ${n.is_read ? "bg-gray-800" : "bg-gray-700"}`}
+            >
+              <div className="cursor-default">
+                <h4 className="font-semibold">{n.title}</h4>
+                <p className="text-sm">{n.message}</p>
+              </div>
+
+              {/* Mark as Read Button */}
+              {!n.is_read && (
+                <button
+                  onClick={() => markRead(n.id)}
+                  className="ml-4 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition"
+                >
+                  Mark as Read
+                </button>
+              )}
             </div>
           ))}
         </div>

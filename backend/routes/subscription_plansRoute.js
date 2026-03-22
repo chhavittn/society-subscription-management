@@ -1,7 +1,7 @@
 const express = require("express");
 
 const router = express.Router();
-const { addPlan, getPlans, getPlanById, updatePlan, deletePlan,
+const { addPlan, getPlans, getPlanByFlatType, updatePlan, deletePlan,
 } = require("../controllers/subscription_plansController");
 const { isAuthenticatedUser, authorizeRoles } = require("../middleware/auth");
 
@@ -16,9 +16,9 @@ router.route("/admin/plans").post(
     addPlan
 );
 
-router.route("/admin/plan/:id").get(
+router.route("/admin/plan/:flat_type").get(
     isAuthenticatedUser,
-    getPlanById
+    getPlanByFlatType
 );
 router.route("/admin/plan/:id").put(
     isAuthenticatedUser,

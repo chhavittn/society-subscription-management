@@ -298,89 +298,226 @@ exports.registerDevice = (async (req, res) => {
   });
 });
 
+// exports.sendNotification = async (req, res) => {
+//   try {
+//     const adminId = req.user.id;
+//     const { title, message, target_type, flat_type } = req.body;
 
-exports.sendNotification = (async (req, res, next) => {
-  const adminId = req.user.id;
-  const { title, message, target_type, user_id, plan_id } = req.body;
+//     // Validate required fields
+//     if (!title || !message || !target_type) {
+//       return res.status(400).json({ success: false, message: "Title, message, and target_type are required" });
+//     }
 
-  if (!title || !message || !target_type) {
-    return next(new ErrorHandler("Title, message and target_type required", 400));
-  }
-  let playerIds = [];
-  // ---------- ALL USERS ----------
-  if (target_type === "all") {
-    const result = await pool.query(
-      `SELECT onesignal_player_id FROM user_devices`
+//     let playerIds = [];
+
+//     // ---------- ALL USERS ----------
+//     if (target_type === "all") {
+//       const result = await pool.query(`SELECT onesignal_player_id FROM user_devices`);
+//       playerIds = result.rows.map(d => d.onesignal_player_id);
+//     }
+
+//     // ---------- FLAT TYPE ----------
+//     else if (target_type === "flat") {
+//       if (!flat_type) {
+//         return res.status(400).json({ success: false, message: "Flat type is required" });
+//       }
+
+//       const result = await pool.query(`
+//         SELECT ud.onesignal_player_id
+//         FROM user_devices ud
+//         JOIN users u ON u.id = ud.user_id
+//         JOIN flats f ON f.user_id = u.id
+//            WHERE LOWER(f.flat_type) = LOWER($1)
+//       `, [flat_type]);
+
+//       playerIds = result.rows.map(d => d.onesignal_player_id);
+//       console.log("Flat type selected:", flat_type);
+//       console.log("Players to notify:", playerIds);
+//     }
+
+//     else {
+//       return res.status(400).json({ success: false, message: "Invalid target_type" });
+//     }
+
+//     // ---------- SEND PUSH ----------
+//     if (playerIds.length > 0) {
+//       await sendNotification(playerIds, title, message);
+//     } else {
+//       console.warn(`No devices found for target_type "${target_type}"${flat_type ? ` with flat_type "${flat_type}"` : ""}`);
+//     }
+
+//     // ---------- SAVE TO DB ----------
+//     await pool.query(
+//       `INSERT INTO notifications
+//        (sender_admin_id, user_id, plan_id, title, message, target_type)
+//        VALUES ($1, $2, $3, $4, $5, $6)`,
+//       [adminId, null, null, title, message, target_type]
+//     );
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Notification sent successfully"
+//     });
+
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ success: false, message: error.message || "Server Error" });
+//   }
+// };
+
+
+// exports.getMyNotifications = async (req, res) => {
+//   const userId = req.user.id;
+//   const result = await pool.query(
+//     `SELECT *
+//      FROM notifications
+//      WHERE user_id=$1 OR target_type='all'
+//      ORDER BY created_at DESC`,
+//     [userId]
+//   );
+//   res.json({
+//     success: true,
+//     notifications: result.rows
+//   });
+
+// };
+
+// exports.markRead = async (req, res) => {
+//   await pool.query(
+//     `UPDATE notifications
+//      SET is_read=TRUE
+//      WHERE id=$1`,
+//     [req.params.id]
+//   );
+//   res.json({ success: true });
+// }
+
+
+exports.sendNotification = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    const { title, message, target_type, flat_type } = req.body;
+
+    if (!title || !message || !target_type) {
+      return res.status(400).json({ success: false, message: "Title, message, and target_type are required" });
+    }
+
+    let playerIds = [];
+    let usersToNotify = []; // array of user IDs to save notifications
+
+    // ---------- ALL USERS ----------
+    if (target_type === "all") {
+      const result = await pool.query(`SELECT id, onesignal_player_id FROM users u LEFT JOIN user_devices ud ON u.id=ud.user_id`);
+      usersToNotify = result.rows.map(r => r.id);
+      playerIds = result.rows.map(r => r.onesignal_player_id).filter(Boolean);
+    }
+
+    // ---------- FLAT TYPE ----------
+    else if (target_type === "flat") {
+      if (!flat_type) return res.status(400).json({ success: false, message: "Flat type is required" });
+
+      const result = await pool.query(`
+        SELECT u.id AS user_id, ud.onesignal_player_id
+        FROM users u
+        JOIN flats f ON f.user_id = u.id
+        LEFT JOIN user_devices ud ON ud.user_id = u.id
+        WHERE f.flat_type = $1
+      `, [flat_type]);
+
+      // playerIds = result.rows.map(r => r.onesignal_player_id).filter(Boolean);
+      // Remove duplicates
+      playerIds = [...new Set(result.rows.map(d => d.onesignal_player_id))];
+      usersToNotify = result.rows.map(r => r.user_id);
+      console.log("Unique player IDs:", playerIds.length);
+      usersToNotify = [...new Set(result.rows.map(r => r.user_id))];
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid target_type" });
+    }
+
+    // ---------- SEND PUSH ----------
+    if (playerIds.length > 0) {
+      await sendNotification(playerIds, title, message);
+    }
+
+    // ---------- SAVE NOTIFICATIONS PER USER ----------
+    const insertPromises = usersToNotify.map(userId =>
+      pool.query(
+        `INSERT INTO notifications
+         (sender_admin_id, user_id, title, message, target_type)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [adminId, userId, title, message, target_type]
+      )
     );
-    playerIds = result.rows.map(d => d.onesignal_player_id);
+    await Promise.all(insertPromises);
+
+    res.status(200).json({
+      success: true,
+      message: `Notification sent to ${usersToNotify.length} users`
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message || "Server Error" });
   }
-
-  // ---------- SPECIFIC USER ----------
-  else if (target_type === "user") {
-
-    if (!user_id) return next(new ErrorHandler("user_id required", 400));
-
-    const result = await pool.query(
-      `SELECT onesignal_player_id FROM user_devices WHERE user_id=$1`,
-      [user_id]
-    );
-
-    playerIds = result.rows.map(d => d.onesignal_player_id);
-  }
-
-  // ---------- PLAN USERS ----------
-  else if (target_type === "plan") {
-    if (!plan_id) return next(new ErrorHandler("plan_id required", 400));
-    const result = await pool.query(`
-      SELECT ud.onesignal_player_id
-      FROM user_devices ud
-      JOIN users u ON u.id = ud.user_id
-      JOIN flats f ON f.user_id = u.id
-      JOIN monthly_subscriptions ms ON ms.flat_id = f.id
-      WHERE ms.plan_id=$1
-    `, [plan_id]);
-
-    playerIds = result.rows.map(d => d.onesignal_player_id);
-  }
-  // ---------- SEND PUSH ----------
-  await sendNotification(playerIds, title, message);
-
-  // ---------- SAVE TO DB ----------
-  await pool.query(
-    `INSERT INTO notifications
-     (sender_admin_id, user_id, plan_id, title, message, target_type)
-     VALUES ($1,$2,$3,$4,$5,$6)`,
-    [adminId, user_id || null, plan_id || null, title, message, target_type]
-  );
-
-  res.status(200).json({
-    success: true,
-    message: "Notification sent successfully"
-  });
-
-});
-exports.getMyNotifications = async (req, res) => {
-  const userId = req.user.id;
-  const result = await pool.query(
-    `SELECT *
-     FROM notifications
-     WHERE user_id=$1 OR target_type='all'
-     ORDER BY created_at DESC`,
-    [userId]
-  );
-  res.json({
-    success: true,
-    notifications: result.rows
-  });
-
 };
+exports.getMyNotifications = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
+    const result = await pool.query(`
+      SELECT n.*
+      FROM notifications n
+      LEFT JOIN flats f ON f.user_id = n.user_id
+      WHERE 
+        n.user_id = $1          -- notifications sent directly to this user
+        OR n.target_type = 'all' -- notifications sent to everyone
+        OR (n.target_type = 'flat' AND f.user_id = $1) -- flat-type notifications for this user
+      ORDER BY n.created_at DESC
+    `, [userId]);
+
+    res.json({
+      success: true,
+      notifications: result.rows
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message || "Server Error" });
+  }
+};
 exports.markRead = async (req, res) => {
-  await pool.query(
-    `UPDATE notifications
-     SET is_read=TRUE
-     WHERE id=$1`,
-    [req.params.id]
-  );
-  res.json({ success: true });
-}
+  try {
+    const userId = req.user.id;
+    const notificationId = req.params.id;
+
+    // Update only if the notification belongs to the user, is for their flat, or is for all
+    const result = await pool.query(`
+      UPDATE notifications n
+      SET is_read = TRUE
+      FROM flats f
+      WHERE n.id = $1
+        AND (
+          n.user_id = $2
+          OR n.target_type = 'all'
+          OR (n.target_type = 'flat' AND f.user_id = $2 AND f.id = n.plan_id)
+        )
+      RETURNING n.*
+    `, [notificationId, userId]);
+
+    if (result.rowCount === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot mark this notification as read"
+      });
+    }
+
+    res.json({
+      success: true,
+      notification: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message || "Server Error" });
+  }
+};

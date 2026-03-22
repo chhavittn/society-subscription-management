@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function ReportsSummary() {
   const [stats, setStats] = useState([])
+  const [flats, setFlats] = useState([])
 
   useEffect(() => {
     fetchData()
@@ -14,51 +15,39 @@ export default function ReportsSummary() {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem("token")
+      if (!token) {
+        console.log("❌ No token found, please login first")
+        return
+      }
 
-      // Fetch payments, flats, and subscriptions
-      const [paymentsRes, flatsRes, subscriptionsRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/v1/admin/payments?limit=1000", {
+      const flatsRes = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/flats?limit=1000`,
+        {
           headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
-        }),
-        axios.get("http://localhost:5000/api/v1/flats?limit=1000", {
+        }
+      )
+      const paymentsRes = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/payments?limit=1000`,
+        {
           headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
-        }),
-        axios.get("http://localhost:5000/api/v1/admin/subscriptions?limit=1000", {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        })
-      ])
+        }
+      )
 
-      const payments = paymentsRes.data.payments
-      const flats = flatsRes.data.flats
-      const subscriptions = subscriptionsRes.data.subscriptions
+      const flats = flatsRes.data.flats || []
+      const payments = paymentsRes.data.payments || []
 
-      // Map subscription_id → flat_id
-      const subscriptionToFlat = {}
-      subscriptions.forEach(sub => {
-        subscriptionToFlat[sub.id] = sub.flat_id
-      })
+      const occupiedFlats = flats.filter(f => f.user_id !== null && f.user_id !== undefined).length
+      const vacantFlats = flats.filter(f => f.user_id === null || f.user_id === undefined).length
 
-      // Metrics
+      // Financial metrics
       let totalCollection = 0
       let pendingAmount = 0
-      const paidFlatsSet = new Set()
-      const overduePayments = []
-      const today = new Date()
 
       payments.forEach(p => {
-        const flatId = subscriptionToFlat[p.subscription_id]
-        const paymentDate = new Date(p.payment_date)
-
-        if (p.status === "success") {
-          totalCollection += Number(p.amount)
-          paidFlatsSet.add(flatId)
-        } else {
-          pendingAmount += Number(p.amount)
-          if (paymentDate < today) overduePayments.push({ ...p, flatId })
-        }
+        if (p.status?.toLowerCase() === "success") totalCollection += Number(p.amount)
+        else pendingAmount += Number(p.amount)
       })
 
       const expectedRevenue = payments.reduce((acc, p) => acc + Number(p.amount), 0)
@@ -66,32 +55,16 @@ export default function ReportsSummary() {
         ? Math.round((totalCollection / expectedRevenue) * 100)
         : 0
 
-      // Defaulters = flats with overdue payments >= 1 month
-      const defaulters = new Set()
-      overduePayments.forEach(p => {
-        const paymentDate = new Date(p.payment_date)
-        const diffMonths = (today.getFullYear() - paymentDate.getFullYear()) * 12 +
-          (today.getMonth() - paymentDate.getMonth())
-        if (diffMonths >= 1) defaulters.add(p.flatId)
-      })
-
-      // Occupied / Vacant flats
-      const totalFlats = flats.length
-      const occupiedFlats = flats.filter(f => f.is_active).length
-      const vacantFlats = totalFlats - occupiedFlats
-
-      // Helper
-      const formatCurrency = (num) => `₹${num.toLocaleString("en-IN")}`
+      const formatCurrency = num => `₹${num.toLocaleString("en-IN")}`
 
       setStats([
+        { title: "Total Flats", value: flats.length.toString() },
+        { title: "Occupied Flats", value: occupiedFlats.toString() },
+        { title: "Vacant Flats", value: vacantFlats.toString() },
         { title: "Total Collection", value: formatCurrency(totalCollection) },
         { title: "Expected Revenue", value: formatCurrency(expectedRevenue) },
         { title: "Collection Efficiency", value: `${collectionEfficiency}%` },
         { title: "Pending Amount", value: formatCurrency(pendingAmount) },
-        { title: "Overdue Payments", value: overduePayments.length.toString() },
-        { title: "Defaulters", value: defaulters.size.toString() },
-        { title: "Occupied Flats", value: occupiedFlats.toString() },
-        { title: "Vacant Flats", value: vacantFlats.toString() },
       ])
 
     } catch (error) {
@@ -99,18 +72,26 @@ export default function ReportsSummary() {
     }
   }
 
+  // Vacant flats list
+  const vacantFlatList = flats.filter(f => !f.user_id)
+
   return (
-    <div className="grid md:grid-cols-4 gap-6">
-      {stats.map((stat, index) => (
-        <Card key={index}>
-          <CardHeader>
-            <CardTitle className="text-sm text-gray-500">{stat.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{stat.value}</p>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="space-y-6">
+
+      {/* --- Stats Cards --- */}
+      <div className="grid md:grid-cols-4 gap-6">
+        {stats.map((stat, index) => (
+          <Card key={index}>
+            <CardHeader>
+              <CardTitle className="text-sm text-gray-500">{stat.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{stat.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
     </div>
   )
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import axios from "axios";
+import { useReactToPrint } from "react-to-print";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,10 +13,11 @@ export default function SubscriptionDetails() {
   const router = useRouter();
   const params = useParams();
 
+  const receiptRef = useRef(null);
+
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
 
-  // List of months
   const months = [
     { name: "January", value: "01" },
     { name: "February", value: "02" },
@@ -31,28 +33,29 @@ export default function SubscriptionDetails() {
     { name: "December", value: "12" },
   ];
 
-  // Initialize month from params, default to current month
   const selectedMonth =
     params.month ||
     `${currentYear}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`;
+
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch subscription from backend
-  useEffect(() => {
+  // 🔥 PRINT FUNCTION
+  const handlePrint = useReactToPrint({
+    contentRef: receiptRef,
+    documentTitle: `Receipt_${subscription?.id}`,
+  }); useEffect(() => {
     const fetchSubscription = async () => {
       try {
         setLoading(true);
-        setError(null);
-
         const { data } = await axios.get(
-          `http://localhost:5000/api/v1/my-subscriptions/${selectedMonth}`,
+          `http://localhost:5000/api/v1/subscriptions/${selectedMonth}`,
           { withCredentials: true }
         );
 
-        if (data.subscription) {
-          setSubscription(data.subscription);
+        if (data.subscriptions?.length > 0) {
+          setSubscription(data.subscriptions[0]);
           setError(null);
         } else {
           setSubscription(null);
@@ -60,13 +63,7 @@ export default function SubscriptionDetails() {
         }
       } catch (err) {
         console.error(err);
-        if (err.response?.status === 404) {
-          setError("No subscription found for " + selectedMonth);
-        } else if (err.response?.status === 400) {
-          setError("Invalid month format. Please select a valid month.");
-        } else {
-          setError("Failed to load subscription details.");
-        }
+        setError("Failed to load subscription.");
         setSubscription(null);
       } finally {
         setLoading(false);
@@ -74,37 +71,89 @@ export default function SubscriptionDetails() {
     };
 
     fetchSubscription();
-  }, [params.month]);
+  }, [selectedMonth]);
 
-  // Handle dropdown change
   const handleMonthChange = (e) => {
-    const monthValue = e.target.value; // "01", "02", etc.
-    const newMonth = `${currentYear}-${monthValue}`;
-
-    router.push(`/user/subscriptions/${newMonth}`);
-
-    console.log("Selected Month:", newMonth);
+    router.push(`/user/subscriptions/${currentYear}-${e.target.value}`);
   };
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center p-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex justify-center p-10">
+        <Loader2 className="animate-spin" />
       </div>
     );
   }
 
+  // ✅ NO GST (FINAL FIX)
+  const breakdown = subscription
+    ? [{ name: "Maintenance Charge", amount: subscription.amount }]
+    : [];
+
+  const totalAmount = subscription?.amount || 0;
+
+
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
+
+      {/* 🔥 HIDDEN RECEIPT */}
+      <div style={{ position: "absolute", left: "-9999px" }}>
+        <div ref={receiptRef}>
+          <div className="p-8 max-w-md mx-auto border bg-white">
+            <h2 className="text-xl font-bold text-center mb-4">
+              Payment Receipt
+            </h2>
+            <div className="mb-4">
+              <p><strong>Name:</strong> {subscription?.user_name}</p>
+              <p><strong>Flat:</strong> {subscription?.flat_number}</p>
+              <p><strong>Block:</strong> {subscription?.block}</p>
+              <p><strong>Plan:</strong> {subscription?.plan_name}</p>
+            </div>
+
+            <div className="mb-4">
+              <p><strong>Month:</strong> {subscription?.month}/{subscription?.year}</p>
+              <p><strong>Amount:</strong> ₹{subscription?.amount}</p>
+              <p><strong>Status:</strong> {subscription?.status}</p>
+            </div>
+
+            {subscription?.status?.toLowerCase() === "paid" && (
+              <div className="mb-4">
+                <p><strong>Payment Mode:</strong> {subscription?.payment_mode}</p>
+                <p><strong>Transaction ID:</strong> {subscription?.transaction_id}</p>
+                <p>
+                  <strong>Date:</strong>{" "}
+                  {subscription?.payment_date
+                    ? new Date(subscription.payment_date).toLocaleDateString()
+                    : "-"}
+                </p>
+              </div>
+            )}
+
+            <div className="text-center mt-6">
+              <p>--------------------------</p>
+              <p>Thank you!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* HEADER */}
       <h1 className="text-3xl font-bold tracking-tight">
-        Subscription Details: {months.find(m => m.value === selectedMonth?.split("-")[1])?.name}
+        Subscription Details:{" "}
+        {
+          months.find(
+            (m) => m.value === selectedMonth?.split("-")[1]
+          )?.name
+        }
       </h1>
 
+      {/* MONTH SELECT */}
       <div className="flex items-center space-x-4">
         <label className="font-medium">Select Month:</label>
         <select
           value={selectedMonth?.split("-")[1]}
           onChange={handleMonthChange}
-          className="border p-2 rounded-md focus:ring-2 focus:ring-primary focus:outline-none"
+          className="border p-2 rounded-md"
         >
           {months.map((m) => (
             <option key={m.value} value={m.value}>
@@ -114,100 +163,126 @@ export default function SubscriptionDetails() {
         </select>
       </div>
 
+      {/* ERROR */}
       {error ? (
-        <div className="p-4 bg-red-50 text-red-600 rounded-md border border-red-200">
+        <div className="p-4 bg-red-50 text-red-600 rounded-md border">
           {error}
         </div>
       ) : subscription && (
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Payment Summary */}
+
+          {/* PAYMENT SUMMARY */}
           <Card>
             <CardHeader>
               <CardTitle>Payment Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-gray-500">Plan</span>
-                <span className="font-medium">{subscription.plan_name || "N/A"}</span>
+
+              <div className="flex justify-between border-b py-2">
+                <span>Plan</span>
+                <span>{subscription.plan_name}</span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-gray-500">Total Amount</span>
-                <span className="font-bold text-lg">₹{Number(subscription.amount).toFixed(2)}</span>
+
+              <div className="flex justify-between border-b py-2">
+                <span>Total Amount</span>
+                <span className="font-bold">
+                  ₹{Number(subscription.amount).toFixed(2)}
+                </span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-gray-500">Status</span>
-                <Badge variant={subscription.status?.toLowerCase() === "paid" ? "default" : "destructive"}>
+
+              <div className="flex justify-between border-b py-2">
+                <span>Status</span>
+                <Badge>
                   {subscription.status}
                 </Badge>
               </div>
-              {subscription.status?.toLowerCase() === "paid" && (
+
+              {/* {subscription.status?.toLowerCase() === "paid" && (
                 <>
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="text-gray-500">Payment Mode</span>
-                    <span className="font-medium">{subscription.payment_mode || "-"}</span>
+                  <div className="flex justify-between border-b py-2">
+                    <span>Payment Mode</span>
+                    <span>{subscription.payment_mode}</span>
                   </div>
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="text-gray-500">Payment Date</span>
-                    <span className="font-medium">
-                      {subscription.payment_date ? new Date(subscription.payment_date).toLocaleDateString() : "-"}
+
+                  <div className="flex justify-between border-b py-2">
+                    <span>Payment Date</span>
+                    <span>
+                      {subscription.payment_date
+                        ? new Date(subscription.payment_date).toLocaleDateString()
+                        : "-"}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-500">Transaction ID</span>
-                    <span className="font-mono text-sm">{subscription.transaction_id || "-"}</span>
+
+                  <div className="flex justify-between py-2">
+                    <span>Transaction ID</span>
+                    <span>{subscription.transaction_id}</span>
                   </div>
                 </>
-              )}
+              )} */}
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-gray-500">Payment Date</span>
+                <span className="font-medium">
+                  {subscription.status?.toLowerCase() === "paid" && subscription.payment_date
+                    ? new Date(subscription.payment_date).toLocaleDateString()
+                    : "-"}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-gray-500">Transaction ID</span>
+                <span className="font-mono text-sm">
+                  {subscription.status?.toLowerCase() === "paid" ? subscription.transaction_id : "-"}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-gray-500">Payment Mode</span>
+                <span className="font-medium">
+                  {subscription.status?.toLowerCase() === "paid" ? subscription.payment_mode : "-"}
+                </span>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Charges Breakdown */}
+          {/* BREAKDOWN */}
           <Card>
             <CardHeader>
               <CardTitle>Charges Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
               <table className="w-full">
-                <thead>
-                  <tr className="border-b text-left text-sm text-gray-500">
-                    <th className="pb-3 font-medium">Charge Type</th>
-                    <th className="pb-3 text-right font-medium">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {subscription.breakdown?.map((item, index) => (
+                <tbody>
+                  {breakdown.map((item, index) => (
                     <tr key={index}>
-                      <td className="py-3 text-sm">{item.name}</td>
-                      <td className="py-3 text-right font-medium">₹{Number(item.amount).toFixed(2)}</td>
+                      <td>{item.name}</td>
+                      <td className="text-right">
+                        ₹{Number(item.amount).toFixed(2)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr className="border-t-2">
-                    <td className="py-3 font-bold">Total</td>
-                    <td className="py-3 text-right font-bold text-lg">₹{Number(subscription.amount).toFixed(2)}</td>
-                  </tr>
-                </tfoot>
               </table>
+
+              <div className="mt-4 font-bold text-right">
+                Total: ₹{Number(totalAmount).toFixed(2)}
+              </div>
 
               <div className="mt-6">
                 {subscription.status?.toLowerCase() === "paid" ? (
-                  <Button
-                    className="w-full"
-                    onClick={() => router.push(`/user/subscriptions/my-subscription/${subscription.id}`)}
-                  >
-                    View / Download Receipt
+                  <Button className="w-full" onClick={handlePrint}>
+                    Download Receipt
                   </Button>
                 ) : (
                   <Button
-                    className="w-full"
-                    variant="default"
-                    onClick={() => router.push(`/pay/${subscription.id}`)}
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push("/user/payments")}
                   >
                     Pay Now
                   </Button>
                 )}
               </div>
+
             </CardContent>
           </Card>
         </div>

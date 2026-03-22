@@ -6,6 +6,11 @@ const handler = NextAuth({
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      authorization: {
+        params: {
+          prompt: "select_account"
+        }
+      }
     })
   ],
 
@@ -15,23 +20,27 @@ const handler = NextAuth({
 
   callbacks: {
 
-    async signIn({ user }) {
+    async signIn({ account }) {
 
       try {
-
-        await fetch("http://localhost:5000/api/v1/google-login", {
+        const res = await fetch("http://localhost:5000/api/v1/login", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
-          credentials: "include",
           body: JSON.stringify({
-            name: user.name,
-            email: user.email
+            token: account.id_token
           })
-        })
+        });
 
-        return true
+        const data = await res.json();
+
+        // 👇 store backend token
+        if (typeof window !== "undefined") {
+          localStorage.setItem("token", data.token);
+        }
+
+        return true;
 
       } catch (error) {
 
@@ -61,7 +70,6 @@ const handler = NextAuth({
 
   pages: {
     signIn: "/login",
-    newUser: "/register"
   }
 })
 

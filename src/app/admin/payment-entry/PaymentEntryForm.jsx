@@ -14,93 +14,119 @@ import {
 } from "@/components/ui/select"
 
 export default function PaymentEntryForm() {
-
-  // 🔹 Flat details
-  const [flatNumber, setFlatNumber] = useState("")
-  const [block, setBlock] = useState("")
-  const [floor, setFloor] = useState("")
+  const [flats, setFlats] = useState([])
+  const [selectedFlatId, setSelectedFlatId] = useState("")
   const [flatType, setFlatType] = useState("")
 
-  // 🔹 Plan + amount
-  const [plans, setPlans] = useState([])
-  const [planId, setPlanId] = useState("")
+  const [planName, setPlanName] = useState("") // auto-filled
+  const [planId, setPlanId] = useState(null)   // store plan_id
   const [amount, setAmount] = useState("")
 
-  // 🔹 Other fields
   const [month, setMonth] = useState("")
   const currentYear = new Date().getFullYear()
   const [method, setMethod] = useState("")
   const [loading, setLoading] = useState(false)
 
-  // ✅ Fetch plans
+  // Fetch flats
   useEffect(() => {
-    const fetchPlans = async () => {
+    const fetchFlats = async () => {
       try {
+        const token = localStorage.getItem("token")
+        if (!token) {
+          console.log("❌ No token found, please login first")
+          return
+        }
+
         const { data } = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/plans`,
-          { withCredentials: true }
+          `${process.env.NEXT_PUBLIC_API_URL}/flats`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true
+          }
         )
-        setPlans(data.plans)
+        setFlats(data.flats || [])
       } catch (err) {
-        console.log("Error fetching plans", err)
+        console.log("Error fetching flats", err.response?.data || err)
       }
     }
-
-    fetchPlans()
+    fetchFlats()
   }, [])
 
-  // ✅ Auto-fill amount when plan changes
+  // When flat is selected, fetch plan by flat_type
   useEffect(() => {
-    const selected = plans.find(p => p.id === Number(planId))
-    if (selected) {
-      setAmount(selected.amount)
-    }
-  }, [planId, plans])
+    if (!selectedFlatId || flats.length === 0) return
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+    const flat = flats.find(f => f.id === Number(selectedFlatId))
+    if (!flat) return
 
-    // 🚨 Validate month first
-    if (!month) {
-      alert("Please select a month")
+    setFlatType(flat.flat_type)
+
+    const token = localStorage.getItem("token")
+    if (!token) {
+      console.log("❌ No token found, please login first")
       return
     }
 
+    const fetchPlan = async () => {
+      try {
+        const { data } = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/admin/plan/${flat.flat_type}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true
+          }
+        )
 
+        if (data.success && data.plan) {
+          setPlanName(data.plan.plan_name)  // auto-fill plan name
+          setAmount(data.plan.amount)       // auto-fill amount
+          setPlanId(data.plan.id)           // ✅ store plan_id for payload
+        }
+      } catch (err) {
+        console.log("Error fetching plan for flat type:", err.response?.data || err)
+        setPlanName("")
+        setAmount("")
+        setPlanId(null)
+      }
+    }
+
+    fetchPlan()
+  }, [selectedFlatId, flats])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!selectedFlatId || !planId || !month || !method) {
+      alert("Please fill all fields")
+      return
+    }
 
     const payload = {
-      flatNumber,
-      block,
-      floor,
-      flatType,
-      plan_id: Number(planId),
-      month: Number(month), // ✅ directly number
+      flat_id: Number(selectedFlatId),
+      plan_id: Number(planId),       // ✅ send correct plan_id
+      month: Number(month),
       year: currentYear,
       payment_mode: method
     }
 
-    console.log("📤 Payload:", payload)
-
+    setLoading(true)
     try {
       const { data } = await axios.post(
-        "http://localhost:5000/api/v1/pay",
+        `${process.env.NEXT_PUBLIC_API_URL}/pay`,
         payload,
         { withCredentials: true }
       )
-
       alert("Payment successful ✅")
-      setFlatNumber("")
-      setBlock("")
-      setFloor("")
-      setFlatType("")
-      setPlanId("")
+      setSelectedFlatId("")
+      setPlanName("")
+      setPlanId(null)
+      setAmount("")
       setMonth("")
       setMethod("")
-      setAmount("")
-
-    } catch (error) {
-      console.log("❌ Error:", error.response?.data)
-      alert(error.response?.data?.message || "Something went wrong")
+    } catch (err) {
+      console.log("Payment error:", err.response?.data || err)
+      alert(err.response?.data?.message || "Payment failed")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -109,68 +135,47 @@ export default function PaymentEntryForm() {
       <CardHeader>
         <CardTitle>Record Payment</CardTitle>
       </CardHeader>
-
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-
-          {/* 🔹 Flat Details */}
-          <Input placeholder="Flat Number" value={flatNumber} onChange={(e) => setFlatNumber(e.target.value)} />
-          <Input placeholder="Block" value={block} onChange={(e) => setBlock(e.target.value)} />
-          <Input placeholder="Floor" value={floor} onChange={(e) => setFloor(e.target.value)} />
-          <Input placeholder="Flat Type" value={flatType} onChange={(e) => setFlatType(e.target.value)} />
-
-          {/* 🔹 Plan */}
-          <Select value={planId} onValueChange={setPlanId} placeholder="Select Plan">
-            <SelectTrigger className="bg-white text-black border border-gray-300">
-              <SelectValue placeholder="Select Plan" />
+          {/* Flat ID */}
+          <Select value={selectedFlatId} onValueChange={setSelectedFlatId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Flat" />
             </SelectTrigger>
-
-            <SelectContent
-              position="popper"
-              sideOffset={5}
-              className="z-[9999] bg-white border border-gray-300 shadow-lg"
-            >
-              {plans.map(plan => (
-                <SelectItem
-                  key={plan.id}
-                  value={String(plan.id)}
-                  className="text-black hover:bg-gray-100"
-                >
-                  {plan.plan_name}
+            <SelectContent>
+              {flats.map(flat => (
+                <SelectItem key={flat.id} value={String(flat.id)}>
+                  {flat.flat_number} ({flat.block})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {/* 🔹 Auto amount */}
-          <Input value={amount} readOnly placeholder="Amount (auto-filled)" />
 
-          {/* 🔹 Month */}
-          <Select onValueChange={setMonth}>
+          {/* Auto-filled Plan Name */}
+          <Input value={planName} readOnly placeholder="Plan (BHK)" />
+
+          {/* Auto-filled Monthly Rate */}
+          <Input value={amount} readOnly placeholder="Monthly Rate" />
+
+          {/* Month */}
+          <Select value={month} onValueChange={setMonth}>
             <SelectTrigger>
               <SelectValue placeholder="Select Month" />
             </SelectTrigger>
-
             <SelectContent>
-              <SelectItem value="1">January</SelectItem>
-              <SelectItem value="2">February</SelectItem>
-              <SelectItem value="3">March</SelectItem>
-              <SelectItem value="4">April</SelectItem>
-              <SelectItem value="5">May</SelectItem>
-              <SelectItem value="6">June</SelectItem>
-              <SelectItem value="7">July</SelectItem>
-              <SelectItem value="8">August</SelectItem>
-              <SelectItem value="9">September</SelectItem>
-              <SelectItem value="10">October</SelectItem>
-              <SelectItem value="11">November</SelectItem>
-              <SelectItem value="12">December</SelectItem>
+              {Array.from({ length: 12 }, (_, i) => (
+                <SelectItem key={i + 1} value={String(i + 1)}>
+                  {new Date(0, i).toLocaleString("default", { month: "long" })}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          {/* 🔹 Payment method */}
+
+          {/* Payment Method */}
           <Select value={method} onValueChange={setMethod}>
             <SelectTrigger>
               <SelectValue placeholder="Payment Method" />
             </SelectTrigger>
-
             <SelectContent>
               <SelectItem value="cash">Cash</SelectItem>
               <SelectItem value="upi">UPI</SelectItem>
@@ -180,7 +185,6 @@ export default function PaymentEntryForm() {
           <Button className="w-full" disabled={loading}>
             {loading ? "Processing..." : "Record Payment"}
           </Button>
-
         </form>
       </CardContent>
     </Card>

@@ -53,10 +53,32 @@ exports.addFlat = async (req, res, next) => {
        RETURNING *`,
       [flat_number, block, floor, flat_type, userId]
     );
+    const newFlat = result.rows[0];
+
+    // 🔹 Automatically create subscription for THIS MONTH as pending
+    const today = new Date();
+    const month = today.getMonth() + 1; // 1-12
+    const year = today.getFullYear();
+
+    await pool.query(
+      `INSERT INTO monthly_subscriptions
+       (flat_id, plan_id, month, year, amount, status, due_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (flat_id, month, year) DO NOTHING`,
+      [
+        newFlat.id,
+        1, // default plan_id
+        month,
+        year,
+        2200, // default amount (can be dynamic per flat_type)
+        "pending",
+        `${year}-${String(month).padStart(2, "0")}-10` // default due_date
+      ]
+    );
 
     res.status(201).json({
       success: true,
-      flat: result.rows[0],
+      flat: newFlat,
     });
 
   } catch (error) {
@@ -68,23 +90,87 @@ exports.addFlat = async (req, res, next) => {
     });
   }
 };
-exports.getAllFlats = (async (req, res, next) => {
-  // Query params
-  let { page = 1, limit = 10, search = "", sortBy = "id", order = "asc" } = req.query;
+// exports.getAllFlats = (async (req, res, next) => {
+//   // Query params
+//   let { page = 1, limit = 10, search = "", sortBy = "id", order = "asc" } = req.query;
+//   page = parseInt(page);
+//   limit = parseInt(limit);
+//   const offset = (page - 1) * limit;
+
+//   // Validate sort column
+//   const sortableFields = ["id", "flat_number", "block", "floor", "flat_type", "is_active"];
+//   if (!sortableFields.includes(sortBy)) sortBy = "id";
+
+//   order = order.toLowerCase() === "desc" ? "DESC" : "ASC";
+
+//   // Search filter
+//   const searchQuery = `%${search}%`;
+
+//   // Total count for pagination
+//   const countResult = await pool.query(`
+//     SELECT COUNT(*) FROM flats f
+//     LEFT JOIN users u ON f.user_id = u.id
+//     WHERE f.flat_number ILIKE $1
+//        OR f.block ILIKE $1
+//        OR f.flat_type ILIKE $1
+//        OR u.name ILIKE $1
+//        OR u.email ILIKE $1
+//   `, [searchQuery]);
+
+//   const total = parseInt(countResult.rows[0].count);
+
+//   // Main query
+//   const result = await pool.query(`
+//     SELECT f.id, f.flat_number, f.block, f.floor, f.flat_type, f.is_active,
+//            u.id as user_id, u.name as user_name, u.email as user_email, u.phone as user_phone
+//     FROM flats f
+//     LEFT JOIN users u ON f.user_id = u.id
+//     WHERE f.flat_number ILIKE $1
+//        OR f.block ILIKE $1
+//        OR f.flat_type ILIKE $1
+//        OR u.name ILIKE $1
+//        OR u.email ILIKE $1
+//     ORDER BY ${sortBy} ${order}
+//     LIMIT $2 OFFSET $3
+//   `, [searchQuery, limit, offset]);
+
+//   res.status(200).json({
+//     success: true,
+//     page,
+//     limit,
+//     total,
+//     totalPages: Math.ceil(total / limit),
+//     flats: result.rows
+//   });
+// });
+exports.getAllFlats = async (req, res, next) => {
+  let { page = 1, limit = 10, search = "", sortBy = "id", sortOrder = "asc" } = req.query;
+
   page = parseInt(page);
   limit = parseInt(limit);
   const offset = (page - 1) * limit;
 
-  // Validate sort column
-  const sortableFields = ["id", "flat_number", "block", "floor", "flat_type", "is_active"];
-  if (!sortableFields.includes(sortBy)) sortBy = "id";
+  // ❌ REMOVE this old validation
+  // const sortableFields = ["id", "flat_number", "block", "floor", "flat_type", "is_active,"];
+  // if (!sortableFields.includes(sortBy)) sortBy = "id";
 
-  order = order.toLowerCase() === "desc" ? "DESC" : "ASC";
+  // ✅ ADD THIS HERE (⭐ VERY IMPORTANT)
+  const sortableFieldsMap = {
+    id: "f.id",
+    flat_number: "f.flat_number",
+    block: "f.block",
+    floor: "f.floor",
+    flat_type: "f.flat_type",
+    is_active: "f.is_active",
+    user_name: "u.name", // ⭐ THIS FIXES YOUR ISSUE
+  };
 
-  // Search filter
+  const sortField = sortableFieldsMap[sortBy] || "f.id";
+
+  const order = sortOrder.toLowerCase() === "desc" ? "DESC" : "ASC";
+
   const searchQuery = `%${search}%`;
 
-  // Total count for pagination
   const countResult = await pool.query(`
     SELECT COUNT(*) FROM flats f
     LEFT JOIN users u ON f.user_id = u.id
@@ -97,7 +183,6 @@ exports.getAllFlats = (async (req, res, next) => {
 
   const total = parseInt(countResult.rows[0].count);
 
-  // Main query
   const result = await pool.query(`
     SELECT f.id, f.flat_number, f.block, f.floor, f.flat_type, f.is_active,
            u.id as user_id, u.name as user_name, u.email as user_email, u.phone as user_phone
@@ -108,7 +193,7 @@ exports.getAllFlats = (async (req, res, next) => {
        OR f.flat_type ILIKE $1
        OR u.name ILIKE $1
        OR u.email ILIKE $1
-    ORDER BY ${sortBy} ${order}
+    ORDER BY ${sortField} ${order}   -- ✅ FIXED HERE
     LIMIT $2 OFFSET $3
   `, [searchQuery, limit, offset]);
 
@@ -120,7 +205,7 @@ exports.getAllFlats = (async (req, res, next) => {
     totalPages: Math.ceil(total / limit),
     flats: result.rows
   });
-});
+};
 
 exports.getSingleFlat = (async (req, res, next) => {
   const result = await pool.query(`

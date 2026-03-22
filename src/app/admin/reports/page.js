@@ -12,8 +12,6 @@ export default function ReportsPage() {
 
       <ReportsSummary />
       <PaymentModeChart />
-      <RevenueOverTimeChart />
-
       <DownloadButtons />
 
     </div>

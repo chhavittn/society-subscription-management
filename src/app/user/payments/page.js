@@ -1,36 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import PaymentCard from "./PaymentCard";
+import { useReactToPrint } from "react-to-print";
+import PaymentModal from "./PaymentModal";
 import PaymentHistory from "./PaymentHistory";
 
 export default function Payments() {
-
-  const [plans, setPlans] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [pendingPayment, setPendingPayment] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const receiptRef = useRef(null); // ✅ ref here
+
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
+
+  const currentPayment = payments.find(
+    (p) => p.month === currentMonth && p.year === currentYear
+  );
+
+  // ✅ PRINT FUNCTION
+  const handlePrint = useReactToPrint({
+    contentRef: receiptRef,
+    documentTitle: `Receipt_${currentMonth}_${currentYear}`,
+  });
+
   const fetchData = async () => {
+    setLoading(true);
     try {
-
-      const plansRes = await axios.get(
-        "http://localhost:5000/api/v1/plans",
-        { withCredentials: true }
-      );
-
       const paymentsRes = await axios.get(
-        "http://localhost:5000/api/v1/my-payments",
+        `${process.env.NEXT_PUBLIC_API_URL}/my-payments`,
         { withCredentials: true }
       );
-
-      setPlans(plansRes.data.plans);
       setPayments(paymentsRes.data.payments);
 
-    } catch (error) {
-      console.error(error);
+      const pendingRes = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/my-pending-payment`,
+        { withCredentials: true }
+      );
+      setPendingPayment(pendingRes.data.pending || null);
+    } catch (err) {
+      console.error(err);
     }
-
     setLoading(false);
   };
 
@@ -40,76 +52,92 @@ export default function Payments() {
 
   if (loading) return <p>Loading...</p>;
 
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear = new Date().getFullYear();
-
-  const paidThisMonth = payments.find(
-    (p) => p.month === currentMonth && p.year === currentYear
-  );
-
-  // last payment
-  const lastPayment = payments.length > 0 ? payments[0] : null;
-
   return (
     <div className="max-w-3xl mx-auto space-y-10">
+      <h1 className="text-3xl font-bold">Pay Maintenance Subscription</h1>
 
-      <h1 className="text-3xl font-bold">
-        Pay Maintenance Subscription
-      </h1>
+      {/* 🔥 HIDDEN RECEIPT (INSIDE SAME FILE) */}
+      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
+        <div ref={receiptRef}>
 
-      {/* FIRST TIME USER */}
-      {payments.length === 0 && (
-        <>
-          <h2 className="text-xl font-semibold">
-            Choose a Subscription Plan
-          </h2>
+          {/* ✅ ONLY RECEIPT */}
+          {currentPayment && pendingPayment && (
+            <div className="p-8 max-w-md mx-auto border bg-white">
+              <h2 className="text-2xl font-bold mb-4 text-center">
+                Payment Receipt
+              </h2>
 
-          <div className="grid gap-6">
-            {plans.map((plan) => (
-              <PaymentCard
-                key={plan.id}
-                plan={plan}
-                allowPayment={true}
-                refreshPayments={fetchData}
-              />
-            ))}
-          </div>
-        </>
+              <div className="space-y-2">
+                <p><strong>Flat Type:</strong> {pendingPayment.flat_type}</p>
+                <p><strong>Month/Year:</strong> {currentPayment.month}/{currentPayment.year}</p>
+                <p><strong>Amount Paid:</strong> ₹{currentPayment.amount}</p>
+                <p><strong>Transaction ID:</strong> {currentPayment.transaction_id}</p>
+                <p><strong>Status:</strong> Paid</p>
+                <p>
+                  <strong>Date:</strong>{" "}
+                  {new Date(currentPayment.payment_date || Date.now()).toLocaleDateString()}
+                </p>
+              </div>
+
+              <div className="mt-6 text-center">
+                <p>---------------------------</p>
+                <p>Thank you!</p>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* MAIN UI */}
+      {pendingPayment && (
+        <div className="bg-yellow-50 p-6 rounded-lg border space-y-4">
+          <h2 className="text-xl font-semibold">Current Month Payment</h2>
+
+          <p><strong>Flat Type:</strong> {pendingPayment.flat_type}</p>
+          <p><strong>Amount:</strong> ₹{pendingPayment.amount}</p>
+
+          <p>
+            <strong>Status:</strong>{" "}
+            <span className={currentPayment ? "text-green-600" : "text-red-500"}>
+              {currentPayment ? "Paid ✅" : "Pending"}
+            </span>
+          </p>
+
+          {!currentPayment && (
+            <PaymentModal
+              amount={pendingPayment.amount}
+              planId={pendingPayment.plan_id}
+              refreshPayments={fetchData}
+              flatType={pendingPayment.flat_type}
+              month={currentMonth}
+              year={currentYear}
+            />
+          )}
+
+          {currentPayment && (
+            <div className="bg-white border rounded p-4 space-y-2">
+              <h3 className="font-semibold text-lg">Payment Details</h3>
+
+              <p>Flat Type: {pendingPayment.flat_type}</p>
+              <p>Month/Year: {currentPayment.month}/{currentPayment.year}</p>
+              <p>Amount Paid: ₹{currentPayment.amount}</p>
+              <p>Transaction ID: {currentPayment.transaction_id}</p>
+              <p>Status: Paid</p>
+
+              {/* 🔥 DOWNLOAD BUTTON */}
+              <button
+                onClick={handlePrint}
+                className="mt-3 w-full bg-black text-white py-2 rounded"
+              >
+                Download Receipt (PDF)
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* ALREADY PAID THIS MONTH */}
-      {paidThisMonth && (
-        <>
-          <div className="bg-green-50 p-6 rounded-lg border">
-
-            <h2 className="text-xl font-semibold">
-              Payment Summary
-            </h2>
-
-            <p>Plan: {paidThisMonth.plan_name}</p>
-            <p>Total Amount: ₹{paidThisMonth.amount}</p>
-            <p>Status: Paid ✔</p>
-            <p>Transaction: {paidThisMonth.transaction_id}</p>
-
-          </div>
-
-          <PaymentHistory payments={payments} />
-        </>
-      )}
-
-      {/* HAS HISTORY BUT NOT PAID THIS MONTH */}
-      {!paidThisMonth && payments.length > 0 && (
-        <>
-          <PaymentCard
-            plan={plans.find(p => p.id === lastPayment.plan_id)}
-            allowPayment={true}
-            refreshPayments={fetchData}
-          />
-
-          <PaymentHistory payments={payments} />
-        </>
-      )}
-
+      <PaymentHistory payments={payments || []} />
     </div>
   );
 }

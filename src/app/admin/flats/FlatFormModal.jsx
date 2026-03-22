@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import axios from "axios"
+import toast from "react-hot-toast";
 
 export default function FlatFormModal({
   mode = "add",
@@ -53,15 +54,18 @@ export default function FlatFormModal({
     e.preventDefault()
 
     if (!flatNumber || !block || !floor || !flatType) {
-      alert("Please fill in flat number, block, floor and flat type")
+      toast.error("Please fill all required flat details");
       return
     }
 
     const parsedFloor = parseInt(floor, 10)
     if (Number.isNaN(parsedFloor)) {
-      alert("Floor must be a valid number")
+      toast.error("Floor must be a valid number");
       return
     }
+    const toastId = toast.loading(
+      mode === "edit" ? "Updating flat..." : "Creating flat..."
+    );
 
     setSubmitting(true)
 
@@ -87,7 +91,7 @@ export default function FlatFormModal({
         )
 
         onUpdated?.(res.data.flat)
-        alert("Flat updated successfully")
+        toast.success("Flat updated successfully ", { id: toastId });
       } else {
         const res = await axios.post(
           "http://localhost:5000/api/v1/admin/flat",
@@ -96,7 +100,7 @@ export default function FlatFormModal({
         )
 
         onCreated?.(res.data.flat)
-        alert("Flat added successfully")
+        toast.success("Flat added successfully ", { id: toastId });
       }
 
       // ✅ Reset form
@@ -116,7 +120,10 @@ export default function FlatFormModal({
 
     } catch (error) {
       console.log(error)
-      alert(error.response?.data?.message || "Failed to save flat")
+      toast.error(
+        error.response?.data?.message || "Failed to save flat ",
+        { id: toastId }
+      );
     } finally {
       setSubmitting(false)
     }
