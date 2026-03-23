@@ -24,30 +24,45 @@ export default function RevenueChart() {
     try {
       const token = localStorage.getItem("token")
 
-      const res = await axios.get(
-        "http://localhost:5000/api/v1/admin/payments",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true
-        }
-      )
+      // /admin/payments is paginated on backend (default limit=10),
+      // so fetch all pages for complete monthly chart data.
+      const pageSize = 100
+      let page = 1
+      let allPayments = []
 
-      const payments = res.data.payments || []
+      while (true) {
+        const res = await axios.get(
+          `http://localhost:5000/api/v1/admin/payments?page=${page}&limit=${pageSize}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true
+          }
+        )
 
-      // ---- Aggregate by month ----
+        const batch = res.data.payments || []
+        allPayments = allPayments.concat(batch)
+
+        if (batch.length < pageSize) break
+        page += 1
+      }
+
+      // ---- Aggregate by year-month ----
       const revenueMap = {}
 
-      payments.forEach(p => {
+      allPayments.forEach(p => {
         const amt = parseFloat(p.amount) || 0
         const date = new Date(p.payment_date)
+        if (Number.isNaN(date.getTime())) return
 
-        const monthIndex = date.getMonth() // 0-11
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, "0")
+        const key = `${year}-${month}`
 
-        if (!revenueMap[monthIndex]) {
-          revenueMap[monthIndex] = 0
+        if (!revenueMap[key]) {
+          revenueMap[key] = 0
         }
 
-        revenueMap[monthIndex] += amt
+        revenueMap[key] += amt
       })
 
       // ---- Convert to chart format ----
@@ -57,9 +72,9 @@ export default function RevenueChart() {
       ]
 
       const chartData = Object.keys(revenueMap)
-        .sort((a, b) => a - b)
+        .sort()
         .map(key => ({
-          month: months[key],
+          month: `${months[Number(key.split("-")[1]) - 1]} ${key.slice(2, 4)}`,
           revenue: revenueMap[key]
         }))
 

@@ -1,6 +1,7 @@
 const express = require("express");
 const { registerUser, loginUser, getUserDetails, getAllUser, getSingleUser, updateUserRole, deleteUser,
-    logout, updatePassword, updateProfile, registerDevice, sendNotification, getMyNotifications, markRead
+    logout, updatePassword, updateProfile, registerDevice, sendNotification, getMyNotifications, markRead,
+    deleteNotification
 } = require("../controllers/userController");
 const { isAuthenticatedUser, authorizeRoles } = require("../middleware/auth");
 
@@ -31,7 +32,11 @@ router.put(
     markRead
 );
 
-
+router.delete(
+  "/notification/:id",
+  isAuthenticatedUser,
+  deleteNotification
+);
 router.route("/me").get(isAuthenticatedUser, getUserDetails);
 
 router.route("/password/update").put(isAuthenticatedUser, updatePassword);

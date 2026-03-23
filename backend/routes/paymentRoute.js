@@ -20,7 +20,7 @@ router.get(
 );
 
 // Admin
-router.get(
+router.post(
   "/admin/mark-paid",
   isAuthenticatedUser,
   authorizeRoles("admin"),

@@ -2,28 +2,38 @@
 
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
+import { useSearchParams } from "next/navigation";
 import { useReactToPrint } from "react-to-print";
 import PaymentModal from "./PaymentModal";
 import PaymentHistory from "./PaymentHistory";
 
 export default function Payments() {
+  const searchParams = useSearchParams();
   const [payments, setPayments] = useState([]);
-  const [pendingPayment, setPendingPayment] = useState(null);
+  const [pendingPayments, setPendingPayments] = useState([]);
+  const [selectedMonth, setSelectedMonth] = useState(null);
+  const [selectedYear, setSelectedYear] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const receiptRef = useRef(null); // ✅ ref here
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
+  const requestedMonth = Number(searchParams.get("month"));
+  const requestedYear = Number(searchParams.get("year"));
 
-  const currentPayment = payments.find(
-    (p) => p.month === currentMonth && p.year === currentYear
+  const selectedPending = pendingPayments.find(
+    (p) => Number(p.month) === Number(selectedMonth) && Number(p.year) === Number(selectedYear)
+  );
+
+  const selectedPayment = payments.find(
+    (p) => Number(p.month) === Number(selectedMonth) && Number(p.year) === Number(selectedYear)
   );
 
   // ✅ PRINT FUNCTION
   const handlePrint = useReactToPrint({
     contentRef: receiptRef,
-    documentTitle: `Receipt_${currentMonth}_${currentYear}`,
+    documentTitle: `Receipt_${selectedMonth}_${selectedYear}`,
   });
 
   const fetchData = async () => {
@@ -33,22 +43,65 @@ export default function Payments() {
         `${process.env.NEXT_PUBLIC_API_URL}/my-payments`,
         { withCredentials: true }
       );
-      setPayments(paymentsRes.data.payments);
+      setPayments(paymentsRes.data.payments || []);
+    } catch (err) {
+      console.error("Error fetching payment history:", err);
+      setPayments([]);
+    }
 
-      const pendingRes = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/my-pending-payment`,
+    try {
+      const subscriptionsRes = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/all`,
         { withCredentials: true }
       );
-      setPendingPayment(pendingRes.data.pending || null);
+
+      const allSubscriptions = subscriptionsRes.data.subscriptions || [];
+      const pending = allSubscriptions
+        .filter((s) => (s.status || "").toLowerCase() !== "paid")
+        .sort((a, b) => {
+          if (Number(a.year) !== Number(b.year)) return Number(a.year) - Number(b.year);
+          return Number(a.month) - Number(b.month);
+        });
+
+      setPendingPayments(pending);
+
+      if (pending.length > 0) {
+        const requestedMatch = pending.find(
+          (p) => Number(p.month) === requestedMonth && Number(p.year) === requestedYear
+        );
+
+        const currentMatch = pending.find(
+          (p) => Number(p.month) === currentMonth && Number(p.year) === currentYear
+        );
+
+        const initial = requestedMatch || currentMatch || pending[0];
+        setSelectedMonth(Number(initial.month));
+        setSelectedYear(Number(initial.year));
+      } else {
+        setSelectedMonth(currentMonth);
+        setSelectedYear(currentYear);
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching pending subscriptions:", err);
+      setPendingPayments([]);
+      setSelectedMonth(currentMonth);
+      setSelectedYear(currentYear);
     }
+
     setLoading(false);
   };
 
   useEffect(() => {
     fetchData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.toString()]);
+
+  const monthOptions = pendingPayments.map((p) => ({
+    key: `${p.year}-${p.month}`,
+    label: `${String(p.month).padStart(2, "0")}/${p.year}`,
+    month: Number(p.month),
+    year: Number(p.year),
+  }));
 
   if (loading) return <p>Loading...</p>;
 
@@ -61,21 +114,21 @@ export default function Payments() {
         <div ref={receiptRef}>
 
           {/* ✅ ONLY RECEIPT */}
-          {currentPayment && pendingPayment && (
+          {selectedPayment && selectedPending && (
             <div className="p-8 max-w-md mx-auto border bg-white">
               <h2 className="text-2xl font-bold mb-4 text-center">
                 Payment Receipt
               </h2>
 
               <div className="space-y-2">
-                <p><strong>Flat Type:</strong> {pendingPayment.flat_type}</p>
-                <p><strong>Month/Year:</strong> {currentPayment.month}/{currentPayment.year}</p>
-                <p><strong>Amount Paid:</strong> ₹{currentPayment.amount}</p>
-                <p><strong>Transaction ID:</strong> {currentPayment.transaction_id}</p>
+                <p><strong>Flat Type:</strong> {selectedPending.plan_name || "Maintenance"}</p>
+                <p><strong>Month/Year:</strong> {selectedPayment.month}/{selectedPayment.year}</p>
+                <p><strong>Amount Paid:</strong> ₹{selectedPayment.amount}</p>
+                <p><strong>Transaction ID:</strong> {selectedPayment.transaction_id}</p>
                 <p><strong>Status:</strong> Paid</p>
                 <p>
                   <strong>Date:</strong>{" "}
-                  {new Date(currentPayment.payment_date || Date.now()).toLocaleDateString()}
+                  {new Date(selectedPayment.payment_date || Date.now()).toLocaleDateString()}
                 </p>
               </div>
 
@@ -90,39 +143,61 @@ export default function Payments() {
       </div>
 
       {/* MAIN UI */}
-      {pendingPayment && (
+      {selectedPending && (
         <div className="bg-yellow-50 p-6 rounded-lg border space-y-4">
-          <h2 className="text-xl font-semibold">Current Month Payment</h2>
+          <h2 className="text-xl font-semibold">Pending Maintenance Payment</h2>
 
-          <p><strong>Flat Type:</strong> {pendingPayment.flat_type}</p>
-          <p><strong>Amount:</strong> ₹{pendingPayment.amount}</p>
+          {monthOptions.length > 1 && (
+            <div className="space-y-2">
+              <p><strong>Select Month</strong></p>
+              <select
+                className="border rounded p-2 w-full"
+                value={`${selectedYear}-${String(selectedMonth).padStart(2, "0")}`}
+                onChange={(e) => {
+                  const [y, m] = e.target.value.split("-");
+                  setSelectedYear(Number(y));
+                  setSelectedMonth(Number(m));
+                }}
+              >
+                {monthOptions.map((opt) => (
+                  <option key={opt.key} value={opt.key}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <p><strong>Flat Type:</strong> {selectedPending.plan_name || "Maintenance"}</p>
+          <p><strong>Month/Year:</strong> {selectedMonth}/{selectedYear}</p>
+          <p><strong>Amount:</strong> ₹{selectedPending.amount}</p>
 
           <p>
             <strong>Status:</strong>{" "}
-            <span className={currentPayment ? "text-green-600" : "text-red-500"}>
-              {currentPayment ? "Paid ✅" : "Pending"}
+            <span className={selectedPayment ? "text-green-600" : "text-red-500"}>
+              {selectedPayment ? "Paid ✅" : "Pending"}
             </span>
           </p>
 
-          {!currentPayment && (
+          {!selectedPayment && (
             <PaymentModal
-              amount={pendingPayment.amount}
-              planId={pendingPayment.plan_id}
+              amount={selectedPending.amount}
+              planId={selectedPending.plan_id}
               refreshPayments={fetchData}
-              flatType={pendingPayment.flat_type}
-              month={currentMonth}
-              year={currentYear}
+              flatType={selectedPending.plan_name || "Maintenance"}
+              month={selectedMonth}
+              year={selectedYear}
             />
           )}
 
-          {currentPayment && (
+          {selectedPayment && (
             <div className="bg-white border rounded p-4 space-y-2">
               <h3 className="font-semibold text-lg">Payment Details</h3>
 
-              <p>Flat Type: {pendingPayment.flat_type}</p>
-              <p>Month/Year: {currentPayment.month}/{currentPayment.year}</p>
-              <p>Amount Paid: ₹{currentPayment.amount}</p>
-              <p>Transaction ID: {currentPayment.transaction_id}</p>
+              <p>Flat Type: {selectedPending.plan_name || "Maintenance"}</p>
+              <p>Month/Year: {selectedPayment.month}/{selectedPayment.year}</p>
+              <p>Amount Paid: ₹{selectedPayment.amount}</p>
+              <p>Transaction ID: {selectedPayment.transaction_id}</p>
               <p>Status: Paid</p>
 
               {/* 🔥 DOWNLOAD BUTTON */}
@@ -134,6 +209,12 @@ export default function Payments() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {!selectedPending && (
+        <div className="bg-green-50 p-6 rounded-lg border">
+          <p className="font-medium">No pending payments found for available months.</p>
         </div>
       )}
 

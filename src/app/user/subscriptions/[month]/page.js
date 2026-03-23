@@ -92,6 +92,7 @@ export default function SubscriptionDetails() {
 
   const totalAmount = subscription?.amount || 0;
 
+  const currentMonthIndex = currentDate.getMonth(); 
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
@@ -155,7 +156,13 @@ export default function SubscriptionDetails() {
           onChange={handleMonthChange}
           className="border p-2 rounded-md"
         >
-          {months.map((m) => (
+          {/* {months.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.name}
+            </option>
+          ))} */}
+
+          {months.slice(0, currentMonthIndex + 1).map((m) => (
             <option key={m.value} value={m.value}>
               {m.name}
             </option>
@@ -276,7 +283,11 @@ export default function SubscriptionDetails() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => router.push("/user/payments")}
+                    onClick={() =>
+                      router.push(
+                        `/user/payments?month=${subscription.month}&year=${subscription.year}`
+                      )
+                    }
                   >
                     Pay Now
                   </Button>

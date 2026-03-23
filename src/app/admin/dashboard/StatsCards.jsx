@@ -15,83 +15,59 @@ export default function StatsCards() {
     try {
       const token = localStorage.getItem("token")
 
+      // 🔹 Fetch all subscriptions for all months
       const res = await axios.get(
-        "http://localhost:5000/api/v1/admin/payments",
+        "http://localhost:5000/api/v1/admin/subscriptions/all",
         {
           headers: { Authorization: `Bearer ${token}` },
           withCredentials: true
         }
       )
 
-      const flatsRes = await axios.get(
-        "http://localhost:5000/api/v1/flats?limit=1000",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true
-        }
-      )
+      const subscriptions = res.data.subscriptions || []
 
-      const totalFlats = flatsRes.data.total || 0
+      const currentDate = new Date()
+      const currentMonth = currentDate.getMonth() + 1
+      const currentYear = currentDate.getFullYear()
 
-      const payments = res.data.payments || []
-
+      // Sets for unique flats
+      const flatsSet = new Set()
       let totalCollected = 0
       let pendingAmount = 0
       let monthlyCollection = 0
 
-      const flatsSet = new Set()
-
-      const currentDate = new Date()
-      const currentMonth = currentDate.getMonth()
-      const currentYear = currentDate.getFullYear()
-
-      payments.forEach(p => {
-        const amt = parseFloat(p.amount) || 0
-
+      subscriptions.forEach(sub => {
         // Unique flats
-        if (p.flat_number) {
-          flatsSet.add(p.flat_number)
+        if (sub.flat_number) flatsSet.add(sub.flat_number)
+
+        // Total collected = paid subscriptions
+        if (sub.status?.toLowerCase() === "paid") {
+          totalCollected += Number(sub.amount) || 0
         }
 
-        // Total collected (only success)
-        if (p.status?.toLowerCase() === "success") {
-          totalCollected += amt
-        }
-
-        // Pending payments
-        if (p.status?.toLowerCase() === "pending") {
-          pendingAmount += amt
+        // Pending subscriptions
+        if (sub.status?.toLowerCase() === "pending") {
+          pendingAmount += Number(sub.amount) || 0
         }
 
         // Monthly collection
-        const date = new Date(p.payment_date)
         if (
-          date.getMonth() === currentMonth &&
-          date.getFullYear() === currentYear &&
-          p.status?.toLowerCase() === "success"
+          Number(sub.month) === currentMonth &&
+          Number(sub.year) === currentYear &&
+          sub.status?.toLowerCase() === "paid"
         ) {
-          monthlyCollection += amt
+          monthlyCollection += Number(sub.amount) || 0
         }
       })
 
       const formattedStats = [
-        { title: "Total Flats", value: totalFlats },
-        {
-          title: "Total Money Collected",
-          value: `₹${totalCollected.toLocaleString("en-IN")}`
-        },
-        {
-          title: "Pending Payments",
-          value: `₹${pendingAmount.toLocaleString("en-IN")}`
-        },
-        {
-          title: "Monthly Collection",
-          value: `₹${monthlyCollection.toLocaleString("en-IN")}`
-        }
+        { title: "Total Flats", value: flatsSet.size },
+        { title: "Total Money Collected", value: `₹${totalCollected.toLocaleString("en-IN")}` },
+        { title: "Pending Payments", value: `₹${pendingAmount.toLocaleString("en-IN")}` },
+        { title: "Monthly Collection", value: `₹${monthlyCollection.toLocaleString("en-IN")}` }
       ]
 
       setStats(formattedStats)
-
     } catch (error) {
       console.error("Error fetching stats:", error)
     }
@@ -106,11 +82,8 @@ export default function StatsCards() {
               {stat.title}
             </CardTitle>
           </CardHeader>
-
           <CardContent>
-            <p className="text-2xl font-bold">
-              {stat.value}
-            </p>
+            <p className="text-2xl font-bold">{stat.value}</p>
           </CardContent>
         </Card>
       ))}

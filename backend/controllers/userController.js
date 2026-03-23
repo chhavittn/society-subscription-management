@@ -521,3 +521,48 @@ exports.markRead = async (req, res) => {
     res.status(500).json({ success: false, message: error.message || "Server Error" });
   }
 };
+
+
+exports.deleteNotification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Allow delete if notification is visible to this user:
+    // direct user notification, global notification, or flat-target notification.
+    const result = await pool.query(
+      `DELETE FROM notifications n
+       WHERE n.id = $1
+         AND (
+           n.user_id = $2
+           OR n.target_type = 'all'
+           OR (
+             n.target_type = 'flat'
+             AND EXISTS (
+               SELECT 1
+               FROM flats f
+               WHERE f.user_id = $2
+             )
+           )
+         )
+       RETURNING *`,
+      [id, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found or unauthorized",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Notification deleted",
+    });
+
+  } catch (error) {
+    console.error("❌ Delete notification error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};

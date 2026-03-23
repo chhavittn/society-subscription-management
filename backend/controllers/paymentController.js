@@ -207,6 +207,7 @@ exports.makePayment = async (req, res) => {
 exports.markSubscriptionPaid = async (req, res) => {
   try {
     const { subscription_id, flat_id, month, year, plan_id, amount, due_date } = req.body;
+    const transactionId = "TXN" + Date.now();
 
     let subscription;
 
@@ -220,14 +221,36 @@ exports.markSubscriptionPaid = async (req, res) => {
         [subscription_id]
       );
       subscription = subRes.rows[0];
+      if (!subscription) {
+        return res.status(404).json({
+          success: false,
+          message: "Subscription not found",
+        });
+      }
     } else {
-      // 🔹 Subscription doesn't exist yet → create it
+      if (!flat_id || !month || !year) {
+        return res.status(400).json({
+          success: false,
+          message: "flat_id, month, year are required when subscription_id is missing",
+        });
+      }
+
+      // 🔹 Create if missing, otherwise mark existing row as paid
       const newSub = await pool.query(
         `INSERT INTO monthly_subscriptions
          (flat_id, plan_id, month, year, amount, status, due_date)
          VALUES ($1, $2, $3, $4, $5, 'paid', $6)
+         ON CONFLICT (flat_id, month, year)
+         DO UPDATE SET status='paid'
          RETURNING *`,
-        [flat_id, plan_id || 1, month, year, amount || 0, due_date]
+        [
+          flat_id,
+          plan_id || 1,
+          month,
+          year,
+          amount || 0,
+          due_date || `${year}-${String(month).padStart(2, "0")}-10`,
+        ]
       );
       subscription = newSub.rows[0];
     }
@@ -238,14 +261,15 @@ exports.markSubscriptionPaid = async (req, res) => {
        (subscription_id, amount, payment_mode, transaction_id, status, payment_date)
        VALUES ($1, $2, 'admin', $3, 'paid', NOW())
        ON CONFLICT (subscription_id) DO UPDATE
-       SET status='paid', payment_mode='admin', payment_date=NOW()`,
-      [subscription.id, subscription.amount, "TXN" + Date.now()]
+       SET status='paid', payment_mode='admin', transaction_id=$3, payment_date=NOW()`,
+      [subscription.id, subscription.amount, transactionId]
     );
 
     res.status(200).json({
       success: true,
       message: "Subscription marked as paid",
       subscription,
+      transaction_id: transactionId,
     });
   } catch (error) {
     console.error("❌ Admin markPaid error:", error);
@@ -372,8 +396,14 @@ exports.mypendingpayment = async (req, res) => {
 
     // 2️⃣ Get the plan for that flat type
     const planRes = await pool.query(
-      `SELECT * FROM subscription_plans WHERE plan_name = $1`,
-      [flat.flat_type]
+      `SELECT *
+       FROM subscription_plans
+       WHERE regexp_replace(LOWER(TRIM(plan_name)), '[^a-z0-9]', '', 'g')
+             = regexp_replace(LOWER(TRIM($1)), '[^a-z0-9]', '', 'g')
+         AND effective_from <= $2::date
+       ORDER BY effective_from DESC
+       LIMIT 1`,
+      [flat.flat_type, `${year}-${String(month).padStart(2, "0")}-01`]
     );
     const plan = planRes.rows[0];
     if (!plan) {
@@ -432,7 +462,11 @@ exports.getReports = async (req, res, next) => {
   try {
     // Fetch all payments and flats
     const paymentsResult = await pool.query("SELECT * FROM payments");
-    const flatsResult = await pool.query("SELECT * FROM flats");
+    const flatsResult = await pool.query(`
+      SELECT f.*, u.name AS user_name, u.email AS user_email
+      FROM flats f
+      LEFT JOIN users u ON u.id = f.user_id
+    `);
 
     const payments = paymentsResult.rows;
     const flats = flatsResult.rows;
@@ -454,7 +488,8 @@ exports.getReports = async (req, res, next) => {
       expectedRevenue += amt;
 
       // Status may be string or boolean
-      const isPaid = p.status === "paid" || p.is_paid === true;
+      const status = (p.status || "").toLowerCase();
+      const isPaid = status === "paid" || status === "success" || p.is_paid === true;
 
       if (isPaid) {
         totalCollection += amt;
@@ -475,7 +510,9 @@ exports.getReports = async (req, res, next) => {
 
     // Flats metrics
     const totalFlats = flats.length;
-    const occupiedFlats = flats.filter(f => f.is_active).length;
+    const occupiedFlats = flats.filter(
+      (f) => Boolean(f.user_name?.trim()) && Boolean(f.user_email?.trim())
+    ).length;
     const vacantFlats = totalFlats - occupiedFlats;
 
     res.status(200).json({

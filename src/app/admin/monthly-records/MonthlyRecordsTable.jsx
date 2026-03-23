@@ -217,7 +217,11 @@ export default function MonthlyRecordsTable() {
         { withCredentials: true }
       )
 
-      setRecords(data.subscriptions || [])
+      const mapped = (data.subscriptions || []).map((r) => ({
+        ...r,
+        subscription_id: r.subscription_id || r.id || 0,
+      }))
+      setRecords(mapped)
     } catch (error) {
       console.error("Error fetching records:", error)
       setRecords([])
@@ -232,28 +236,30 @@ export default function MonthlyRecordsTable() {
 
   // ✅ Mark subscription as paid
   const markAsPaid = async (recordId) => {
-    const record = records.find(r => r.id === recordId)
+    const record = records.find(r => r.subscription_id === recordId)
     if (!record) return
 
     try {
       const [year, monthNum] = month.split("-")
 
-      await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/admin/subscription/${recordId}`,
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/mark-paid`,
         {
+          subscription_id: record.subscription_id || undefined,
+          flat_id: record.flat_id,
           plan_id: record.plan_id || 1,
-          amount: record.amount || 0,
-          due_date: record.due_date,
+          amount: record.amount || 2200,
+          due_date: record.due_date || `${year}-${monthNum}-10`,
           month: Number(monthNum),
           year: Number(year),
-          status: "paid",
         },
         { withCredentials: true }
       )
+      const updatedSubId = res.data?.subscription?.id || record.subscription_id
 
       // Update status in table
       setRecords(prev =>
-        prev.map(r => r.id === recordId ? { ...r, status: "paid" } : r)
+        prev.map(r => r.flat_id === record.flat_id ? { ...r, status: "paid", subscription_id: updatedSubId } : r)
       )
     } catch (error) {
       console.error("Failed to mark paid:", error)
@@ -310,13 +316,13 @@ export default function MonthlyRecordsTable() {
             {records.map(record => {
               const status = record.status?.trim().toLowerCase()
               return (
-                <tr key={record.id} className="border-t">
+                <tr key={record.flat_id} className="border-t">
                   <td className="p-3">{record.flat_number} ({record.block})</td>
                   <td className="p-3">{record.user_name}</td>
                   <td className="p-3">{getStatusBadge(record.status)}</td>
                   <td className="p-3">
                     {["pending", "overdue"].includes(status) && (
-                      <Button size="sm" onClick={() => markAsPaid(record.id)}>
+                      <Button size="sm" onClick={() => markAsPaid(record.subscription_id)}>
                         Mark Paid
                       </Button>
                     )}

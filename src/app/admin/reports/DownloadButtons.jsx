@@ -1,374 +1,270 @@
-// "use client"
-
-// import { useEffect, useState, useRef } from "react"
-// import axios from "axios"
-// import { useReactToPrint } from "react-to-print"
-// import { Button } from "@/components/ui/button"
-// import ReportContent from "./ReportContent"
-
-// export default function DownloadButtons() {
-//   const [paymentData, setPaymentData] = useState([])
-//   const [monthlyMap, setMonthlyMap] = useState({})
-//   const [yearlyMap, setYearlyMap] = useState({})
-//   const [selectedMonth, setSelectedMonth] = useState("")
-//   const [selectedYear, setSelectedYear] = useState("")
-//   const reportRef = useRef(null)
-
-//   useEffect(() => {
-//     const fetchData = async () => {
-//       const token = localStorage.getItem("token")
-//       if (!token) return
-
-//       const res = await axios.get("http://localhost:5000/api/v1/admin/payments", {
-//         headers: { Authorization: `Bearer ${token}` },
-//         withCredentials: true,
-//       })
-
-//       const payments = res.data.payments || []
-//       setPaymentData(payments)
-
-//       const monthMapTemp = {} // YYYY-MM => payments
-//       const yearMapTemp = {}  // YYYY => payments
-
-//       payments.forEach((p) => {
-//         const date = new Date(p.payment_date)
-//         const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1)
-//           .toString()
-//           .padStart(2, "0")}`
-//         if (!monthMapTemp[monthKey]) monthMapTemp[monthKey] = []
-//         monthMapTemp[monthKey].push(p)
-
-//         const yearKey = date.getFullYear().toString()
-//         if (!yearMapTemp[yearKey]) yearMapTemp[yearKey] = []
-//         yearMapTemp[yearKey].push(p)
-//       })
-
-//       // Sort months and years
-//       const sortedMonths = Object.keys(monthMapTemp).sort()
-//       const sortedYears = Object.keys(yearMapTemp).sort()
-
-//       setMonthlyMap(monthMapTemp)
-//       setYearlyMap(yearMapTemp)
-//       setSelectedMonth(sortedMonths[sortedMonths.length - 1] || "")
-//       setSelectedYear(sortedYears[sortedYears.length - 1] || "")
-//     }
-
-//     fetchData()
-//   }, [])
-
-//   // ----- CSV Downloads -----
-//   const downloadMonthlyCSV = () => {
-//     const payments = monthlyMap[selectedMonth] || []
-//     let csv = `Monthly Report - ${selectedMonth}\nFlat,Owner,Amount,Payment Mode,Payment Date\n`
-//     payments.forEach((p) => {
-//       const owner = p.user_name || "Unassigned"
-//       csv += `${p.flat_number || p.flat_id},${owner},${p.amount},${p.payment_mode},${new Date(p.payment_date).toLocaleDateString()}\n`
-//     })
-
-//     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-//     const link = document.createElement("a")
-//     link.href = URL.createObjectURL(blob)
-//     link.setAttribute("download", `monthly-report-${selectedMonth}.csv`)
-//     document.body.appendChild(link)
-//     link.click()
-//     document.body.removeChild(link)
-//   }
-
-//   const downloadYearlyCSV = () => {
-//     const payments = yearlyMap[selectedYear] || []
-//     let csv = `Yearly Report - ${selectedYear}\nFlat,Owner,Amount,Payment Mode,Payment Date\n`
-//     payments.forEach((p) => {
-//       const owner = p.user_name || "Unassigned"
-//       csv += `${p.flat_number || p.flat_id},${owner},${p.amount},${p.payment_mode},${new Date(p.payment_date).toLocaleDateString()}\n`
-//     })
-
-//     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-//     const link = document.createElement("a")
-//     link.href = URL.createObjectURL(blob)
-//     link.setAttribute("download", `yearly-report-${selectedYear}.csv`)
-//     document.body.appendChild(link)
-//     link.click()
-//     document.body.removeChild(link)
-//   }
-
-//   // ----- PDF Downloads -----
-//   const handlePrintMonthly = useReactToPrint({
-//     content: () => reportRef.current,
-//     documentTitle: `Monthly Report - ${selectedMonth}`,
-//   })
-
-//   const handlePrintYearly = useReactToPrint({
-//     content: () => reportRef.current,
-//     documentTitle: `Yearly Report - ${selectedYear}`,
-//   })
-
-//   return (
-//     <div className="space-y-6">
-//       {/* Hidden PDF content */}
-//       <div style={{ display: "none" }}>
-//         <ReportContent
-//           ref={reportRef}
-//           payments={paymentData}
-//           monthlyMap={monthlyMap}
-//           yearlyMap={yearlyMap}
-//           selectedMonth={selectedMonth}
-//           selectedYear={selectedYear}
-//         />
-//       </div>
-
-//       {/* --- Monthly Report --- */}
-//       <div className="flex gap-2 items-center">
-//         <label>Monthly Report:</label>
-//         <select
-//           className="border p-2 rounded"
-//           value={selectedMonth}
-//           onChange={(e) => setSelectedMonth(e.target.value)}
-//         >
-//           {Object.keys(monthlyMap)
-//             .sort()
-//             .map((month) => (
-//               <option key={month} value={month}>
-//                 {month}
-//               </option>
-//             ))}
-//         </select>
-//         <Button onClick={downloadMonthlyCSV}>Download Monthly CSV</Button>
-//         <Button variant="secondary" onClick={handlePrintMonthly}>
-//           Download Monthly PDF
-//         </Button>
-//       </div>
-
-//       {/* --- Yearly Report --- */}
-//       <div className="flex gap-2 items-center">
-//         <label>Yearly Report:</label>
-//         <select
-//           className="border p-2 rounded"
-//           value={selectedYear}
-//           onChange={(e) => setSelectedYear(e.target.value)}
-//         >
-//           {Object.keys(yearlyMap)
-//             .sort()
-//             .map((year) => (
-//               <option key={year} value={year}>
-//                 {year}
-//               </option>
-//             ))}
-//         </select>
-//         <Button onClick={downloadYearlyCSV}>Download Yearly CSV</Button>
-//         <Button variant="secondary" onClick={handlePrintYearly}>
-//           Download Yearly PDF
-//         </Button>
-//       </div>
-//     </div>
-//   )
-// }
-
 "use client"
 
-import { useEffect, useState, useRef, forwardRef } from "react"
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios"
 import { useReactToPrint } from "react-to-print"
 import { Button } from "@/components/ui/button"
 
-// Forward ref to ReportContent so react-to-print can access it
-const ReportContent = forwardRef(
-  ({ monthlyData, yearlyData, selectedMonth, selectedYear }, ref) => {
-    return (
-      <div ref={ref} className="p-4">
-        <h2 className="text-xl font-semibold mb-2">
-          {monthlyData.length
-            ? `Monthly Report - ${selectedMonth}`
-            : `Yearly Report - ${selectedYear}`}
-        </h2>
-        <table className="border-collapse border w-full">
-          <thead>
-            <tr>
-              <th className="border px-2 py-1">Flat</th>
-              <th className="border px-2 py-1">Owner</th>
-              <th className="border px-2 py-1">Amount</th>
-              <th className="border px-2 py-1">Payment Mode</th>
-              <th className="border px-2 py-1">Payment Date</th>
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+]
+
+const PrintableReport = forwardRef(function PrintableReport({ title, rows }, ref) {
+  return (
+    <div ref={ref} className="p-6 bg-white text-black w-full max-w-4xl mx-auto space-y-4">
+      <h2 className="text-xl font-bold">{title}</h2>
+      <table className="w-full border-collapse border">
+        <thead>
+          <tr>
+            <th className="border px-2 py-1 text-left">Flat</th>
+            <th className="border px-2 py-1 text-left">Owner</th>
+            <th className="border px-2 py-1 text-left">Amount</th>
+            <th className="border px-2 py-1 text-left">Payment Mode</th>
+            <th className="border px-2 py-1 text-left">Payment Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((p, idx) => (
+            <tr key={idx}>
+              <td className="border px-2 py-1">{p.flat_number || p.flat_id || "-"}</td>
+              <td className="border px-2 py-1">{p.user_name || "Unassigned"}</td>
+              <td className="border px-2 py-1">₹{Number(p.amount || 0).toLocaleString("en-IN")}</td>
+              <td className="border px-2 py-1">{p.payment_mode || "-"}</td>
+              <td className="border px-2 py-1">
+                {p.payment_date ? new Date(p.payment_date).toLocaleDateString("en-IN") : "-"}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {(monthlyData.length ? monthlyData : yearlyData).map((p, idx) => (
-              <tr key={idx}>
-                <td className="border px-2 py-1">{p.flat_number || p.flat_id || "-"}</td>
-                <td className="border px-2 py-1">{p.user_name || "Unassigned"}</td>
-                <td className="border px-2 py-1">{p.amount}</td>
-                <td className="border px-2 py-1">{p.payment_mode}</td>
-                <td className="border px-2 py-1">
-                  {new Date(p.payment_date).toLocaleDateString("en-IN")}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+})
+
+function parseMonth(paymentDate) {
+  const d = new Date(paymentDate)
+  if (Number.isNaN(d.getTime())) return null
+  return { year: d.getFullYear(), month: d.getMonth() + 1, time: d.getTime() }
+}
+
+function downloadCSV(rows, fileName, title) {
+  if (!rows.length) {
+    alert("No data to download")
+    return
   }
-)
+
+  let csv = `${title}\nFlat,Owner,Amount,Payment Mode,Payment Date\n`
+  rows.forEach((p) => {
+    const flat = p.flat_number || p.flat_id || "-"
+    const owner = p.user_name || "Unassigned"
+    const amount = Number(p.amount || 0)
+    const mode = p.payment_mode || "-"
+    const date = p.payment_date ? new Date(p.payment_date).toLocaleDateString("en-IN") : "-"
+    csv += `${flat},${owner},${amount},${mode},${date}\n`
+  })
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+  const link = document.createElement("a")
+  link.href = URL.createObjectURL(blob)
+  link.setAttribute("download", fileName)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
 
 export default function DownloadButtons() {
-  const [monthlyMap, setMonthlyMap] = useState({})
-  const [yearlyMap, setYearlyMap] = useState({})
-  const [selectedMonth, setSelectedMonth] = useState("")
+  const [payments, setPayments] = useState([])
   const [selectedYear, setSelectedYear] = useState("")
-  const reportRef = useRef(null)
+  const [selectedMonth, setSelectedMonth] = useState("")
+
+  const monthlyPrintRef = useRef(null)
+  const yearlyPrintRef = useRef(null)
+
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
 
   useEffect(() => {
-    const fetchPayments = async () => {
+    const fetchAllPayments = async () => {
       try {
         const token = localStorage.getItem("token")
         if (!token) return
 
-        const res = await axios.get(
-          "http://localhost:5000/api/v1/admin/payments",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            withCredentials: true,
-          }
-        )
+        const all = []
+        let page = 1
+        const pageSize = 500
 
-        const payments = res.data.payments || []
+        while (true) {
+          const res = await axios.get(
+            `http://localhost:5000/api/v1/admin/payments?page=${page}&limit=${pageSize}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              withCredentials: true,
+            }
+          )
 
-        const monthly = {}
-        const yearly = {}
+          const batch = res.data.payments || []
+          all.push(...batch)
+          if (batch.length < pageSize) break
+          page += 1
+        }
 
-        payments.forEach((p) => {
-          const date = new Date(p.payment_date)
-          if (isNaN(date)) return
-
-          // Monthly
-          const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1)
-            .toString()
-            .padStart(2, "0")}`
-          if (!monthly[monthKey]) monthly[monthKey] = []
-          monthly[monthKey].push(p)
-
-          // Yearly
-          const yearKey = date.getFullYear().toString()
-          if (!yearly[yearKey]) yearly[yearKey] = []
-          yearly[yearKey].push(p)
-        })
-
-        setMonthlyMap(monthly)
-        setYearlyMap(yearly)
-
-        // Default selections: latest month and year
-        const months = Object.keys(monthly).sort()
-        const years = Object.keys(yearly).sort()
-        if (months.length) setSelectedMonth(months[months.length - 1])
-        if (years.length) setSelectedYear(years[years.length - 1])
+        setPayments(all)
       } catch (err) {
         console.error("Error fetching payments:", err)
       }
     }
 
-    fetchPayments()
+    fetchAllPayments()
   }, [])
 
-  const downloadCSV = (payments, type, key) => {
-    if (!payments || !payments.length) {
-      alert("No data to download")
-      return
-    }
-    let csv = `${type} Revenue Report - ${key}\nFlat,Owner,Amount,Payment Mode,Payment Date\n`
-    payments.forEach((p) => {
-      const owner = p.user_name || "Unassigned"
-      const flat = p.flat_number || p.flat_id || "-"
-      const date = new Date(p.payment_date).toLocaleDateString("en-IN")
-      csv += `${flat},${owner},${p.amount},${p.payment_mode},${date}\n`
-    })
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    link.href = URL.createObjectURL(blob)
-    link.setAttribute("download", `${type}-report-${key}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
+  const paidPayments = useMemo(() => {
+    return payments
+      .filter((p) => {
+        const status = (p.status || "").toLowerCase()
+        return status === "paid" || status === "success"
+      })
+      .map((p) => {
+        const parsed = parseMonth(p.payment_date)
+        return parsed ? { ...p, _year: parsed.year, _month: parsed.month, _time: parsed.time } : null
+      })
+      .filter(Boolean)
+      .sort((a, b) => a._time - b._time)
+  }, [payments])
 
-  const handlePrint = useReactToPrint({
-    content: () => reportRef.current,
-    documentTitle: "Financial Report",
-    onBeforeGetContent: () => {
-      const payments =
-        monthlyMap[selectedMonth] || yearlyMap[selectedYear] || []
-      if (!payments.length) {
-        alert("No data available to print")
-        return null
-      }
-    },
+  const availableYears = useMemo(() => {
+    const years = Array.from(new Set(paidPayments.map((p) => p._year))).sort((a, b) => a - b)
+    return years
+  }, [paidPayments])
+
+  useEffect(() => {
+    if (!availableYears.length) return
+
+    const defaultYear = availableYears.includes(currentYear)
+      ? currentYear
+      : availableYears[availableYears.length - 1]
+
+    setSelectedYear(String(defaultYear))
+  }, [availableYears, currentYear])
+
+  useEffect(() => {
+    if (!selectedYear) return
+    const yearNum = Number(selectedYear)
+    const maxMonth = yearNum === currentYear ? currentMonth : 12
+    setSelectedMonth(String(maxMonth).padStart(2, "0"))
+  }, [selectedYear, currentYear, currentMonth])
+
+  const monthOptions = useMemo(() => {
+    if (!selectedYear) return []
+    const yearNum = Number(selectedYear)
+    const maxMonth = yearNum === currentYear ? currentMonth : 12
+    return Array.from({ length: maxMonth }, (_, i) => i + 1)
+  }, [selectedYear, currentYear, currentMonth])
+
+  const monthlyRows = useMemo(() => {
+    if (!selectedYear || !selectedMonth) return []
+    const y = Number(selectedYear)
+    const m = Number(selectedMonth)
+    return paidPayments.filter((p) => p._year === y && p._month <= m)
+  }, [paidPayments, selectedYear, selectedMonth])
+
+  const yearlyRows = useMemo(() => {
+    if (!selectedYear) return []
+    const y = Number(selectedYear)
+    const maxMonth = y === currentYear ? currentMonth : 12
+    return paidPayments.filter((p) => p._year === y && p._month <= maxMonth)
+  }, [paidPayments, selectedYear, currentYear, currentMonth])
+
+  const monthlyTitle = selectedYear && selectedMonth
+    ? `Monthly Revenue Report (${selectedYear}) - Jan to ${MONTH_NAMES[Number(selectedMonth) - 1]}`
+    : "Monthly Revenue Report"
+
+  const yearlyTitle = selectedYear
+    ? `Yearly Revenue Report (${selectedYear}) - Till ${selectedYear === String(currentYear) ? MONTH_NAMES[currentMonth - 1] : "December"}`
+    : "Yearly Revenue Report"
+
+  const handlePrintMonthly = useReactToPrint({
+    contentRef: monthlyPrintRef,
+    documentTitle: `monthly-report-${selectedYear || "year"}-till-${selectedMonth || "month"}`,
+  })
+
+  const handlePrintYearly = useReactToPrint({
+    contentRef: yearlyPrintRef,
+    documentTitle: `yearly-report-${selectedYear || "year"}`,
   })
 
   return (
     <div className="space-y-4">
-      {/* Offscreen ReportContent for printing */}
       <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-        <ReportContent
-          ref={reportRef}
-          monthlyData={monthlyMap[selectedMonth] || []}
-          yearlyData={yearlyMap[selectedYear] || []}
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-        />
+        <PrintableReport ref={monthlyPrintRef} title={monthlyTitle} rows={monthlyRows} />
+        <PrintableReport ref={yearlyPrintRef} title={yearlyTitle} rows={yearlyRows} />
       </div>
 
-      {/* Monthly Selector */}
-      <div className="flex gap-2 items-center">
-        <label>Monthly Report:</label>
-        <select
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="border p-2 rounded ml-2"
-        >
-          {Object.keys(monthlyMap)
-            .sort()
-            .map((month) => (
-              <option key={month} value={month}>
-                {month}
-              </option>
-            ))}
-        </select>
-        <Button
-          onClick={() =>
-            downloadCSV(monthlyMap[selectedMonth], "Monthly", selectedMonth)
-          }
-        >
-          Download CSV
-        </Button>
-        <Button variant="secondary" onClick={handlePrint}>
-          Download PDF
-        </Button>
-      </div>
-
-      {/* Yearly Selector */}
-      <div className="flex gap-2 items-center mt-2">
-        <label>Yearly Report:</label>
+      <div className="flex flex-wrap gap-2 items-center">
+        <label className="font-medium">Year:</label>
         <select
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
-          className="border p-2 rounded ml-2"
+          className="border p-2 rounded"
         >
-          {Object.keys(yearlyMap)
-            .sort()
-            .map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
+          {availableYears.map((y) => (
+            <option key={y} value={String(y)}>
+              {y}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <label className="font-medium">Monthly Report (Jan to):</label>
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="border p-2 rounded"
+        >
+          {monthOptions.map((m) => (
+            <option key={m} value={String(m).padStart(2, "0")}>{MONTH_NAMES[m - 1]}</option>
+          ))}
         </select>
         <Button
           onClick={() =>
-            downloadCSV(yearlyMap[selectedYear], "Yearly", selectedYear)
+            downloadCSV(
+              monthlyRows,
+              `monthly-report-${selectedYear}-till-${selectedMonth}.csv`,
+              monthlyTitle
+            )
           }
         >
           Download CSV
         </Button>
-        <Button variant="secondary" onClick={handlePrint}>
-          Download PDF
+        <Button variant="secondary" onClick={handlePrintMonthly}>Download PDF</Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <label className="font-medium">Yearly Report (Till Current Month):</label>
+        <Button
+          onClick={() =>
+            downloadCSV(
+              yearlyRows,
+              `yearly-report-${selectedYear}.csv`,
+              yearlyTitle
+            )
+          }
+        >
+          Download CSV
         </Button>
+        <Button variant="secondary" onClick={handlePrintYearly}>Download PDF</Button>
       </div>
     </div>
   )

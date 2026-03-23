@@ -19,16 +19,30 @@ export function PaymentModeChart() {
       const token = localStorage.getItem("token")
       if (!token) return console.log("❌ No token found")
 
-      const res = await axios.get("http://localhost:5000/api/v1/admin/payments", {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true
-      })
+      const allPayments = []
+      let page = 1
+      const pageSize = 500
+      while (true) {
+        const res = await axios.get(
+          `http://localhost:5000/api/v1/admin/payments?page=${page}&limit=${pageSize}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true
+          }
+        )
 
-      const payments = res.data.payments || []
+        const batch = res.data.payments || []
+        allPayments.push(...batch)
+        if (batch.length < pageSize) break
+        page += 1
+      }
 
       // ✅ Defensive normalization
       const modeMap = {}
-      payments.forEach(p => {
+      allPayments.forEach(p => {
+        const status = (p.status || "").toLowerCase()
+        if (!(status === "paid" || status === "success")) return
+
         let mode = (p.payment_mode || "Unknown").trim() // remove spaces
         if (!mode) mode = "Unknown"
         mode = mode.toLowerCase() // unify casing

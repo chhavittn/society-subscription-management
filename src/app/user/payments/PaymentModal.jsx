@@ -22,22 +22,22 @@ export default function PaymentModal({ amount, planId, refreshPayments, flatType
     }
 
     try {
-      const currentMonth = new Date().getMonth() + 1;
-      const currentYear = new Date().getFullYear();
-
       const { data } = await axios.post(
         "http://localhost:5000/api/v1/pay",
         {
           payment_mode: "card",
           plan_id: planId,
-          month: currentMonth,
-          year: currentYear
+          month,
+          year
         },
         { withCredentials: true }
       );
 
       if (data.success) {
-        setPaymentData(data.payment);
+        setPaymentData({
+          amount: data?.subscription?.amount ?? amount,
+          transaction_id: data?.transaction_id || "-",
+        });
         setSuccess(true);
         if (refreshPayments) refreshPayments();
       }

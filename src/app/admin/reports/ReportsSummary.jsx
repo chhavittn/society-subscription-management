@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function ReportsSummary() {
   const [stats, setStats] = useState([])
-  const [flats, setFlats] = useState([])
 
   useEffect(() => {
     fetchData()
@@ -27,30 +26,41 @@ export default function ReportsSummary() {
           withCredentials: true,
         }
       )
-      const paymentsRes = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/admin/payments?limit=1000`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      )
-
       const flats = flatsRes.data.flats || []
-      const payments = paymentsRes.data.payments || []
+      const allPayments = []
+      let page = 1
+      const pageSize = 500
+      while (true) {
+        const paymentsRes = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/admin/payments?page=${page}&limit=${pageSize}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true,
+          }
+        )
+        const batch = paymentsRes.data.payments || []
+        allPayments.push(...batch)
+        if (batch.length < pageSize) break
+        page += 1
+      }
 
-      const occupiedFlats = flats.filter(f => f.user_id !== null && f.user_id !== undefined).length
-      const vacantFlats = flats.filter(f => f.user_id === null || f.user_id === undefined).length
+      const isOccupied = (flat) =>
+        Boolean(flat.user_name?.trim()) && Boolean(flat.user_email?.trim())
+
+      const occupiedFlats = flats.filter(isOccupied).length
+      const vacantFlats = flats.length - occupiedFlats
 
       // Financial metrics
       let totalCollection = 0
       let pendingAmount = 0
 
-      payments.forEach(p => {
-        if (p.status?.toLowerCase() === "success") totalCollection += Number(p.amount)
+      allPayments.forEach(p => {
+        const status = (p.status || "").toLowerCase()
+        if (status === "paid" || status === "success") totalCollection += Number(p.amount)
         else pendingAmount += Number(p.amount)
       })
 
-      const expectedRevenue = payments.reduce((acc, p) => acc + Number(p.amount), 0)
+      const expectedRevenue = allPayments.reduce((acc, p) => acc + Number(p.amount), 0)
       const collectionEfficiency = expectedRevenue > 0
         ? Math.round((totalCollection / expectedRevenue) * 100)
         : 0
@@ -71,9 +81,6 @@ export default function ReportsSummary() {
       console.error("Error fetching reports:", error)
     }
   }
-
-  // Vacant flats list
-  const vacantFlatList = flats.filter(f => !f.user_id)
 
   return (
     <div className="space-y-6">

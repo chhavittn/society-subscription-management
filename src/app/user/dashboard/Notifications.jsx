@@ -35,6 +35,25 @@ export default function Notifications({ token }) {
       console.error("Error marking notification read:", error.response?.data || error.message);
     }
   };
+  const deleteNotification = async (id) => {
+    if (!token) return;
+
+    try {
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL}/notification/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        }
+      );
+
+      // 🔥 remove from UI instantly
+      setNotifications(prev => prev.filter(n => n.id !== id));
+
+    } catch (error) {
+      console.error("Error deleting notification:", error.response?.data || error.message);
+    }
+  };
   useEffect(() => {
 
     if (!token) return;
@@ -117,20 +136,30 @@ export default function Notifications({ token }) {
               key={n.id}
               className={`p-4 border-b bg-gray-700 text-white flex justify-between items-center ${n.is_read ? "bg-gray-800" : "bg-gray-700"}`}
             >
-              <div className="cursor-default">
-                <h4 className="font-semibold">{n.title}</h4>
-                <p className="text-sm">{n.message}</p>
-              </div>
+              <div className="flex justify-between items-center w-full">
+                <div>
+                  <h4 className="font-semibold">{n.title}</h4>
+                  <p className="text-sm">{n.message}</p>
+                </div>
 
-              {/* Mark as Read Button */}
-              {!n.is_read && (
-                <button
-                  onClick={() => markRead(n.id)}
-                  className="ml-4 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition"
-                >
-                  Mark as Read
-                </button>
-              )}
+                <div className="flex gap-2">
+                  {!n.is_read && (
+                    <button
+                      onClick={() => markRead(n.id)}
+                      className="bg-blue-600 text-xs px-2 py-1 rounded"
+                    >
+                      Read
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => deleteNotification(n.id)}
+                    className="bg-red-600 text-xs px-2 py-1 rounded"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             </div>
           ))}
         </div>

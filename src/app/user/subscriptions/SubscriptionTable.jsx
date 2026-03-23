@@ -66,7 +66,11 @@ export default function SubscriptionTable({ subscriptions }) {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => router.push("/user/payments")}
+                      onClick={() =>
+                        router.push(
+                          `/user/payments?month=${sub.month}&year=${sub.year}`
+                        )
+                      }
                     >
                       Pay Now
                     </Button>

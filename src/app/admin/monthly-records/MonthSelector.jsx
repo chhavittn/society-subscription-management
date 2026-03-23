@@ -180,7 +180,7 @@ export default function MonthlyRecordsTable() {
       const allFlats = filtered.map(r => ({
         ...r,
         status: r.status || "pending",
-        subscription_id: r.id || 0,
+        subscription_id: r.subscription_id || r.id || 0,
       }));
 
       setRecords(allFlats);
@@ -201,30 +201,20 @@ export default function MonthlyRecordsTable() {
     try {
       const [year, monthNum] = month.split("-");
 
-      if (!record.subscription_id || record.subscription_id === 0) {
-        // Create new subscription
-        const res = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/admin/subscription`,
-          {
-            flat_id: record.flat_id,
-            plan_id: record.plan_id || 1,
-            amount: record.amount || 2200,
-            month: Number(monthNum),
-            year: Number(year),
-            due_date: record.due_date || `${year}-${monthNum}-10`,
-            status: "paid",
-          },
-          { withCredentials: true }
-        );
-        record.subscription_id = res.data.subscription.id;
-      } else {
-        // Update existing subscription
-        await axios.put(
-          `${process.env.NEXT_PUBLIC_API_URL}/admin/subscription/${record.subscription_id}`,
-          { status: "paid" },
-          { withCredentials: true }
-        );
-      }
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/admin/mark-paid`,
+        {
+          subscription_id: record.subscription_id || undefined,
+          flat_id: record.flat_id,
+          plan_id: record.plan_id || 1,
+          amount: record.amount || 2200,
+          month: Number(monthNum),
+          year: Number(year),
+          due_date: record.due_date || `${year}-${monthNum}-10`,
+        },
+        { withCredentials: true }
+      );
+      record.subscription_id = res.data?.subscription?.id || record.subscription_id;
 
       setRecords(prev =>
         prev.map(r =>

@@ -40,7 +40,7 @@ export default function ReceiptPage() {
 
   // If subscription is pending, redirect to payment page
   if (subscription.status?.toLowerCase() === "pending") {
-    router.push(`/pay/${subscription.id}`)
+    router.push(`/user/payments?month=${subscription.month}&year=${subscription.year}`)
     return null
   }
 

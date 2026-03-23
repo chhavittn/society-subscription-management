@@ -60,6 +60,18 @@ exports.addFlat = async (req, res, next) => {
     const month = today.getMonth() + 1; // 1-12
     const year = today.getFullYear();
 
+    const planRes = await pool.query(
+      `SELECT id, amount
+       FROM subscription_plans
+       WHERE regexp_replace(LOWER(TRIM(plan_name)), '[^a-z0-9]', '', 'g')
+             = regexp_replace(LOWER(TRIM($1)), '[^a-z0-9]', '', 'g')
+         AND effective_from <= $2::date
+       ORDER BY effective_from DESC
+       LIMIT 1`,
+      [newFlat.flat_type, `${year}-${String(month).padStart(2, "0")}-01`]
+    );
+    const selectedPlan = planRes.rows[0] || { id: 1, amount: 2200 };
+
     await pool.query(
       `INSERT INTO monthly_subscriptions
        (flat_id, plan_id, month, year, amount, status, due_date)
@@ -67,10 +79,10 @@ exports.addFlat = async (req, res, next) => {
        ON CONFLICT (flat_id, month, year) DO NOTHING`,
       [
         newFlat.id,
-        1, // default plan_id
+        selectedPlan.id,
         month,
         year,
-        2200, // default amount (can be dynamic per flat_type)
+        selectedPlan.amount,
         "pending",
         `${year}-${String(month).padStart(2, "0")}-10` // default due_date
       ]
