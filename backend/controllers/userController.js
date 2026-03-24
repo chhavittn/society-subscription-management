@@ -396,7 +396,7 @@ exports.registerDevice = (async (req, res) => {
 exports.sendNotification = async (req, res) => {
   try {
     const adminId = req.user.id;
-    const { title, message, target_type, flat_type } = req.body;
+    const { title, message, target_type, flat_type, flat_id } = req.body;
 
     if (!title || !message || !target_type) {
       return res.status(400).json({ success: false, message: "Title, message, and target_type are required" });
@@ -404,12 +404,17 @@ exports.sendNotification = async (req, res) => {
 
     let playerIds = [];
     let usersToNotify = []; // array of user IDs to save notifications
+    let insertTargetType = target_type;
 
     // ---------- ALL USERS ----------
     if (target_type === "all") {
-      const result = await pool.query(`SELECT id, onesignal_player_id FROM users u LEFT JOIN user_devices ud ON u.id=ud.user_id`);
-      usersToNotify = result.rows.map(r => r.id);
-      playerIds = result.rows.map(r => r.onesignal_player_id).filter(Boolean);
+      const result = await pool.query(`
+        SELECT u.id AS user_id, ud.onesignal_player_id
+        FROM users u
+        LEFT JOIN user_devices ud ON u.id = ud.user_id
+      `);
+      usersToNotify = [...new Set(result.rows.map(r => r.user_id))];
+      playerIds = [...new Set(result.rows.map(r => r.onesignal_player_id).filter(Boolean))];
     }
 
     // ---------- FLAT TYPE ----------
@@ -430,6 +435,29 @@ exports.sendNotification = async (req, res) => {
       usersToNotify = result.rows.map(r => r.user_id);
       console.log("Unique player IDs:", playerIds.length);
       usersToNotify = [...new Set(result.rows.map(r => r.user_id))];
+    } else if (target_type === "single_flat") {
+      if (!flat_id) {
+        return res.status(400).json({ success: false, message: "Flat is required" });
+      }
+
+      const result = await pool.query(`
+        SELECT u.id AS user_id, ud.onesignal_player_id
+        FROM flats f
+        JOIN users u ON f.user_id = u.id
+        LEFT JOIN user_devices ud ON ud.user_id = u.id
+        WHERE f.id = $1
+      `, [flat_id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "No resident found for this flat"
+        });
+      }
+
+      playerIds = [...new Set(result.rows.map(r => r.onesignal_player_id).filter(Boolean))];
+      usersToNotify = [...new Set(result.rows.map(r => r.user_id))];
+      insertTargetType = "flat";
     } else {
       return res.status(400).json({ success: false, message: "Invalid target_type" });
     }
@@ -439,16 +467,25 @@ exports.sendNotification = async (req, res) => {
       await sendNotification(playerIds, title, message);
     }
 
-    // ---------- SAVE NOTIFICATIONS PER USER ----------
-    const insertPromises = usersToNotify.map(userId =>
-      pool.query(
+    // ---------- SAVE NOTIFICATIONS ----------
+    if (target_type === "all") {
+      await pool.query(
         `INSERT INTO notifications
          (sender_admin_id, user_id, title, message, target_type)
          VALUES ($1, $2, $3, $4, $5)`,
-        [adminId, userId, title, message, target_type]
-      )
-    );
-    await Promise.all(insertPromises);
+        [adminId, null, title, message, insertTargetType]
+      );
+    } else {
+      const insertPromises = usersToNotify.map(userId =>
+        pool.query(
+          `INSERT INTO notifications
+           (sender_admin_id, user_id, title, message, target_type)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [adminId, userId, title, message, insertTargetType]
+        )
+      );
+      await Promise.all(insertPromises);
+    }
 
     res.status(200).json({
       success: true,

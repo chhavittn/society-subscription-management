@@ -2,14 +2,13 @@ import FlatsTable from "./FlatsTable.jsx"
 
 export default function Flats() {
   return (
-    <div className="space-y-6">
-
-      <h1 className="text-3xl font-bold">
-        Flats Management
-      </h1>
-
+    <div className="admin-page">
+      <div>
+        <h1 className="admin-title mb-2">
+          Flats Management
+        </h1>
+      </div>
       <FlatsTable />
-
     </div>
   )
 }

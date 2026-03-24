@@ -1,97 +1,58 @@
-// "use client";
-
-// export default function PaymentHistory({ payments = [] }) {
-
-//   const currentMonth = new Date().getMonth() + 1;
-//   const currentYear = new Date().getFullYear();
-
-//   const previousPayments = payments.filter(
-//     p => !(p.month === currentMonth && p.year === currentYear)
-//   );
-
-//   if (previousPayments.length === 0) {
-//     return (
-//       <p className="text-gray-500">
-//         No transactions found in history
-//       </p>
-//     );
-//   }
-
-//   return (
-//     <div>
-//       <h2 className="text-xl font-semibold mb-4">
-//         Transaction History
-//       </h2>
-
-//       <table className="w-full border">
-//         <thead className="bg-gray-100">
-//           <tr>
-//             <th className="p-2 border">Month</th>
-//             <th className="p-2 border">Amount</th>
-//             <th className="p-2 border">Status</th>
-//             <th className="p-2 border">Transaction</th>
-//           </tr>
-//         </thead>
-
-//         <tbody>
-//           {previousPayments.map((p) => (
-//             <tr key={p.id}>
-//               <td className="p-2 border">{p.month}/{p.year}</td>
-//               <td className="p-2 border">₹{p.amount}</td>
-//               <td className="p-2 border">{p.status}</td>
-//               <td className="p-2 border">{p.transaction_id}</td>
-//             </tr>
-//           ))}
-//         </tbody>
-//       </table>
-//     </div>
-//   );
-// }
-
 "use client";
+
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function PaymentHistory({ payments = [] }) {
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
-  // ✅ Only include payments that are paid and not current month pending
   const previousPayments = payments.filter(
-    p =>
-      p.status?.toLowerCase() === "paid" &&
-      !(p.month === currentMonth && p.year === currentYear && p.status.toLowerCase() !== "paid")
+    (payment) =>
+      payment.status?.toLowerCase() === "paid" &&
+      !(payment.month === currentMonth && payment.year === currentYear && payment.status.toLowerCase() !== "paid")
   );
 
   if (previousPayments.length === 0) {
-    return (
-      <p className="text-gray-500">No transactions found in history</p>
-    );
+    return <p className="text-[#636e72]">No transactions found in history</p>;
   }
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold mb-4">Transaction History</h2>
-
-      <table className="w-full border">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="p-2 border">Month</th>
-            <th className="p-2 border">Amount</th>
-            <th className="p-2 border">Status</th>
-            <th className="p-2 border">Transaction</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {previousPayments.map((p) => (
-            <tr key={p.id}>
-              <td className="p-2 border">{p.month}/{p.year}</td>
-              <td className="p-2 border">₹{p.amount}</td>
-              <td className="p-2 border">{p.status}</td>
-              <td className="p-2 border">{p.transaction_id}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Card className="admin-card mt-6">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold text-[#2d3436]">Transaction History</CardTitle>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <div className="admin-table-wrap">
+          <table className="w-full border-collapse">
+            <thead className="admin-table-head">
+              <tr className="admin-table-head-row">
+                <th className="p-3 text-left">Month</th>
+                <th className="p-3 text-left">Amount</th>
+                <th className="p-3 text-left">Status</th>
+                <th className="p-3 text-left">Transaction ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {previousPayments.map((payment, index) => (
+                <tr
+                  key={payment.id}
+                  className={`border-t border-[#dfe6e9] ${
+                    index % 2 === 0 ? "admin-row-even" : "admin-row-odd"
+                  } admin-row-hover`}
+                >
+                  <td className="p-3 text-[#2d3436]">{payment.month}/{payment.year}</td>
+                  <td className="p-3 text-[#2d3436]">₹{payment.amount}</td>
+                  <td className="p-3">
+                    <Badge className="admin-badge-paid">Paid</Badge>
+                  </td>
+                  <td className="p-3 text-[#636e72]">{payment.transaction_id}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

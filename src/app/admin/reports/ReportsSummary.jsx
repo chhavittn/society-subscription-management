@@ -7,11 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 export default function ReportsSummary() {
   const [stats, setStats] = useState([])
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
+  async function fetchData() {
     try {
       const token = localStorage.getItem("token")
       if (!token) {
@@ -50,7 +46,6 @@ export default function ReportsSummary() {
       const occupiedFlats = flats.filter(isOccupied).length
       const vacantFlats = flats.length - occupiedFlats
 
-      // Financial metrics
       let totalCollection = 0
       let pendingAmount = 0
 
@@ -82,23 +77,30 @@ export default function ReportsSummary() {
     }
   }
 
+  useEffect(() => {
+    fetchData()
+  }, [])
+
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {stats.map((stat, index) => (
+        <Card
+          key={index}
+          className="admin-card hover:scale-[1.02]"
+        >
+          <CardHeader>
+            <CardTitle className="text-sm text-[#636e72]">
+              {stat.title}
+            </CardTitle>
+          </CardHeader>
 
-      {/* --- Stats Cards --- */}
-      <div className="grid md:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <Card key={index}>
-            <CardHeader>
-              <CardTitle className="text-sm text-gray-500">{stat.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{stat.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
+          <CardContent>
+            <p className="text-2xl font-bold text-[#2d3436]">
+              {stat.value}
+            </p>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }

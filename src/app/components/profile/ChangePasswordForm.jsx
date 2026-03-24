@@ -1,99 +1,76 @@
-"use client"
-// after reloading page the admin becomes user
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { useRouter } from "next/navigation"
-export default function ChangePasswordForm() {
+"use client";
 
-  const [currentPassword, setCurrentPassword] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const router = useRouter()
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import toast from "react-hot-toast";
+
+export default function ChangePasswordForm({ onSuccess, onCancel }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const handleChangePassword = (e) => {
+    e.preventDefault();
 
-    e.preventDefault()
-
-    if (newPassword !== confirmPassword) {
-      alert("Passwords do not match")
-      return
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Please fill all fields");
+      return;
     }
 
-    console.log({
-      currentPassword,
-      newPassword
-    })
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
 
-    alert("Password changed successfully")
-    setCurrentPassword("")
-    setNewPassword("")
-    setConfirmPassword("")
-    router.push("/profile")
-  }
+    toast.success("Password changed successfully");
+
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+
+    onSuccess?.();
+  };
 
   return (
+    <div className="admin-page">
+      <Card className="admin-card mx-auto w-full max-w-2xl">
+        <CardHeader className="border-b border-[#dfe6e9]">
+          <p className="summary-kicker mb-2">Security</p>
+          <CardTitle className="text-2xl text-[#2d3436]">Change Password</CardTitle>
+        </CardHeader>
 
-    <Card className="max-w-md mx-auto mt-8">
+        <CardContent className="p-6">
+          <form onSubmit={handleChangePassword} className="space-y-5" autoComplete="off">
+            <input type="text" style={{ display: "none" }} />
+            <input type="password" style={{ display: "none" }} />
 
-      <CardHeader>
-        <CardTitle>Change Password</CardTitle>
-      </CardHeader>
+            <div className="space-y-2">
+              <Label className="text-[#636e72]">Current Password</Label>
+              <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="admin-input" />
+            </div>
 
-      <CardContent>
+            <div className="space-y-2">
+              <Label className="text-[#636e72]">New Password</Label>
+              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="admin-input" />
+            </div>
 
-        <form
-          onSubmit={handleChangePassword}
-          className="space-y-4"
-          autoComplete="off"
-        >
+            <div className="space-y-2">
+              <Label className="text-[#636e72]">Confirm Password</Label>
+              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="admin-input" />
+            </div>
 
-          {/* Hidden inputs to block browser autofill */}
-          <input type="text" name="fakeUser" autoComplete="username" style={{ display: "none" }} />
-          <input type="password" name="fakePass" autoComplete="current-password" style={{ display: "none" }} />
-
-          <div className="space-y-2">
-            <Label>Current Password</Label>
-            <Input
-              type="password"
-              name="currentPasswordField"
-              autoComplete="new-password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>New Password</Label>
-            <Input
-              type="password"
-              name="newPasswordField"
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Confirm Password</Label>
-            <Input
-              type="password"
-              name="confirmPasswordField"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-          </div>
-
-          <Button type="submit" className="w-full">
-            Change Password
-          </Button>
-
-        </form>
-
-      </CardContent>
-
-    </Card>
-  )
+            <div className="flex flex-wrap gap-3">
+              <Button className="admin-btn-primary rounded-xl px-5 py-2.5">Change Password</Button>
+              <Button type="button" variant="outline" onClick={onCancel} className="admin-btn-ghost rounded-xl px-5 py-2.5">
+                Back
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

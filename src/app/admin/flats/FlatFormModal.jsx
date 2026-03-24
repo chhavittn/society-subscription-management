@@ -22,28 +22,24 @@ export default function FlatFormModal({
   onCreated,
   onUpdated,
 }) {
-  // Flat fields
   const [flatNumber, setFlatNumber] = useState("")
   const [block, setBlock] = useState("")
   const [floor, setFloor] = useState("")
   const [flatType, setFlatType] = useState("")
 
-  // ✅ NEW: Owner fields
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
 
   const [submitting, setSubmitting] = useState(false)
   const [open, setOpen] = useState(false)
-  // ✅ Prefill for edit
+
   useEffect(() => {
     if (existingFlat) {
       setFlatNumber(existingFlat.flat_number || "")
       setBlock(existingFlat.block || "")
       setFloor(existingFlat.floor || "")
       setFlatType(existingFlat.flat_type || "")
-
-      // 👇 NEW
       setName(existingFlat.user_name || "")
       setEmail(existingFlat.user_email || "")
       setPhone(existingFlat.user_phone || "")
@@ -63,6 +59,7 @@ export default function FlatFormModal({
       toast.error("Floor must be a valid number");
       return
     }
+
     const toastId = toast.loading(
       mode === "edit" ? "Updating flat..." : "Creating flat..."
     );
@@ -91,7 +88,7 @@ export default function FlatFormModal({
         )
 
         onUpdated?.(res.data.flat)
-        toast.success("Flat updated successfully ", { id: toastId });
+        toast.success("Flat updated successfully", { id: toastId });
       } else {
         const res = await axios.post(
           "http://localhost:5000/api/v1/admin/flat",
@@ -100,10 +97,9 @@ export default function FlatFormModal({
         )
 
         onCreated?.(res.data.flat)
-        toast.success("Flat added successfully ", { id: toastId });
+        toast.success("Flat added successfully", { id: toastId });
       }
 
-      // ✅ Reset form
       setFlatNumber("")
       setBlock("")
       setFloor("")
@@ -112,16 +108,12 @@ export default function FlatFormModal({
       setEmail("")
       setPhone("")
 
-      if (mode === "add") {
-        setOpen(false)   // ✅ close add modal
-      } else {
-        onClose?.()      // ✅ close edit modal (parent controlled)
-      }
+      if (mode === "add") setOpen(false)
+      else onClose?.()
 
     } catch (error) {
-      console.log(error)
       toast.error(
-        error.response?.data?.message || "Failed to save flat ",
+        error.response?.data?.message || "Failed to save flat",
         { id: toastId }
       );
     } finally {
@@ -139,76 +131,97 @@ export default function FlatFormModal({
     >
       <DialogTrigger asChild>
         {mode === "add" && (
-          <Button onClick={() => setOpen(true)}>Add Flat</Button>
+          <Button className="admin-btn-secondary">
+            Add Flat
+          </Button>
         )}
       </DialogTrigger>
 
-      <DialogContent>
+      <DialogContent className="admin-modal max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-[#2d3436] text-xl">
             {mode === "edit" ? "Edit Flat" : "Add Flat"}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
 
-          {/* Flat fields */}
-          <Input
-            placeholder="Flat Number"
-            value={flatNumber}
-            onChange={(e) => setFlatNumber(e.target.value)}
-          />
+          {/* Row 1 */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              placeholder="Flat Number"
+              className="admin-input"
+              value={flatNumber}
+              onChange={(e) => setFlatNumber(e.target.value)}
+            />
+            <Input
+              placeholder="Block"
+              className="admin-input"
+              value={block}
+              onChange={(e) => setBlock(e.target.value)}
+            />
+          </div>
 
-          <Input
-            placeholder="Block"
-            value={block}
-            onChange={(e) => setBlock(e.target.value)}
-          />
+          {/* Row 2 */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              placeholder="Floor"
+              type="number"
+              className="admin-input"
+              value={floor}
+              onChange={(e) => setFloor(e.target.value)}
+            />
+            <Input
+              placeholder="Flat Type"
+              className="admin-input"
+              value={flatType}
+              onChange={(e) => setFlatType(e.target.value)}
+            />
+          </div>
 
-          <Input
-            placeholder="Floor"
-            type="number"
-            value={floor}
-            onChange={(e) => setFloor(e.target.value)}
-          />
-
-          <Input
-            placeholder="Flat Type"
-            value={flatType}
-            onChange={(e) => setFlatType(e.target.value)}
-          />
-
-          {/* 🔥 NEW: Owner Section */}
-          <div className="border-t pt-3 space-y-3">
-            <p className="text-sm font-semibold text-gray-600">
+          <div className="border-t border-[#dfe6e9] pt-4 space-y-4">
+            <p className="text-sm font-semibold text-[#636e72]">
               Owner Details
             </p>
 
-            <Input
-              placeholder="Owner Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-
-            <Input
-              placeholder="Owner Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                placeholder="Owner Name"
+                className="admin-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <Input
+                placeholder="Owner Email"
+                className="admin-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
 
             <Input
               placeholder="Owner Phone"
+              className="admin-input"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-3 pt-2">
             <DialogClose asChild>
-              <Button type="button" variant="outline">Cancel</Button>
+              <Button
+                type="button"
+                className="admin-btn-ghost"
+              >
+                Cancel
+              </Button>
             </DialogClose>
 
-            <Button type="submit" disabled={submitting}>
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="admin-btn-primary"
+            >
               {submitting
                 ? "Saving..."
                 : mode === "edit"
@@ -216,6 +229,7 @@ export default function FlatFormModal({
                   : "Save Flat"}
             </Button>
           </div>
+
         </form>
       </DialogContent>
     </Dialog>

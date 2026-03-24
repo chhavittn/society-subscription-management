@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios"
 import { useReactToPrint } from "react-to-print"
 import { Button } from "@/components/ui/button"
+import toast from "react-hot-toast"
 
 const MONTH_NAMES = [
   "January",
@@ -60,7 +61,7 @@ function parseMonth(paymentDate) {
 
 function downloadCSV(rows, fileName, title) {
   if (!rows.length) {
-    alert("No data to download")
+    toast.error("No data to download")
     return
   }
 
@@ -81,6 +82,7 @@ function downloadCSV(rows, fileName, title) {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
+  toast.success("CSV downloaded")
 }
 
 export default function DownloadButtons() {
@@ -197,26 +199,48 @@ export default function DownloadButtons() {
   const handlePrintMonthly = useReactToPrint({
     contentRef: monthlyPrintRef,
     documentTitle: `monthly-report-${selectedYear || "year"}-till-${selectedMonth || "month"}`,
+    onAfterPrint: () => {
+      toast.success("PDF saved successfully")
+    },
   })
 
   const handlePrintYearly = useReactToPrint({
     contentRef: yearlyPrintRef,
     documentTitle: `yearly-report-${selectedYear || "year"}`,
+    onAfterPrint: () => {
+      toast.success("PDF saved successfully")
+    },
   })
 
-  return (
-    <div className="space-y-4">
-      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-        <PrintableReport ref={monthlyPrintRef} title={monthlyTitle} rows={monthlyRows} />
-        <PrintableReport ref={yearlyPrintRef} title={yearlyTitle} rows={yearlyRows} />
-      </div>
+  const onDownloadMonthlyPdf = () => {
+    if (!monthlyRows.length) {
+      toast.error("No data to download")
+      return
+    }
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <label className="font-medium">Year:</label>
+    handlePrintMonthly()
+  }
+
+  const onDownloadYearlyPdf = () => {
+    if (!yearlyRows.length) {
+      toast.error("No data to download")
+      return
+    }
+
+    handlePrintYearly()
+  }
+
+  return (
+    <div className="admin-card p-6 space-y-6">
+      <div className="flex flex-wrap gap-3 items-center">
+        <label className="text-sm font-semibold text-[#2d3436]">
+          Year:
+        </label>
+
         <select
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
-          className="border p-2 rounded"
+          className="admin-native-select"
         >
           {availableYears.map((y) => (
             <option key={y} value={String(y)}>
@@ -226,45 +250,70 @@ export default function DownloadButtons() {
         </select>
       </div>
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <label className="font-medium">Monthly Report (Jan to):</label>
+      <div className="flex flex-wrap gap-3 items-center">
+        <label className="text-sm font-semibold text-[#2d3436]">
+          Monthly Report:
+        </label>
+
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="border p-2 rounded"
+          className="admin-native-select"
         >
           {monthOptions.map((m) => (
-            <option key={m} value={String(m).padStart(2, "0")}>{MONTH_NAMES[m - 1]}</option>
+            <option key={m} value={String(m).padStart(2, "0")}>
+              {MONTH_NAMES[m - 1]}
+            </option>
           ))}
         </select>
+
         <Button
+          className="admin-btn-primary"
           onClick={() =>
             downloadCSV(
               monthlyRows,
-              `monthly-report-${selectedYear}-till-${selectedMonth}.csv`,
+              `monthly-report-${selectedYear || "year"}-till-${selectedMonth || "month"}.csv`,
               monthlyTitle
             )
           }
         >
           Download CSV
         </Button>
-        <Button variant="secondary" onClick={handlePrintMonthly}>Download PDF</Button>
+
+        <Button
+          variant="outline"
+          className="admin-btn-ghost"
+          onClick={onDownloadMonthlyPdf}
+        >
+          Download PDF
+        </Button>
       </div>
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <label className="font-medium">Yearly Report (Till Current Month):</label>
+      <div className="flex flex-wrap gap-3 items-center">
+        <label className="text-sm font-semibold text-[#2d3436]">
+          Yearly Report:
+        </label>
+
         <Button
+          className="admin-btn-secondary"
           onClick={() =>
             downloadCSV(
               yearlyRows,
-              `yearly-report-${selectedYear}.csv`,
+              `yearly-report-${selectedYear || "year"}.csv`,
               yearlyTitle
             )
           }
         >
           Download CSV
         </Button>
-        <Button variant="secondary" onClick={handlePrintYearly}>Download PDF</Button>
+
+        <Button
+          variant="outline"
+          className="admin-btn-ghost"
+          onClick={onDownloadYearlyPdf}
+        >
+          Download PDF
+        </Button>
       </div>
     </div>
   )

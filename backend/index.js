@@ -3,7 +3,7 @@ require("dotenv").config();
 const app = require("./app");
 const {connectDatabase} = require("./db");
 
-dotenv.config({ path: "/.env" });
+dotenv.config();
 
 connectDatabase();
 

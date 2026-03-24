@@ -1,41 +1,36 @@
-"use client"
-import { useState, useEffect } from "react"
-import axios from "axios"
+// PaymentEntryForm.jsx
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react";
+import axios from "axios";
+import toast from "react-hot-toast";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 
 export default function PaymentEntryForm() {
-  const [flats, setFlats] = useState([])
-  const [selectedFlatId, setSelectedFlatId] = useState("")
-  const [flatType, setFlatType] = useState("")
+  const [flats, setFlats] = useState([]);
+  const [selectedFlatId, setSelectedFlatId] = useState("");
+  const [planName, setPlanName] = useState("");
+  const [planId, setPlanId] = useState(null);
+  const [amount, setAmount] = useState("");
+  const [month, setMonth] = useState("");
+  const currentYear = new Date().getFullYear();
+  const [method, setMethod] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [planName, setPlanName] = useState("") // auto-filled
-  const [planId, setPlanId] = useState(null)   // store plan_id
-  const [amount, setAmount] = useState("")
-
-  const [month, setMonth] = useState("")
-  const currentYear = new Date().getFullYear()
-  const [method, setMethod] = useState("")
-  const [loading, setLoading] = useState(false)
-
-  // Fetch flats
   useEffect(() => {
     const fetchFlats = async () => {
       try {
-        const token = localStorage.getItem("token")
-        if (!token) {
-          console.log("❌ No token found, please login first")
-          return
-        }
+        const token = localStorage.getItem("token");
 
         const { data } = await axios.get(
           `${process.env.NEXT_PUBLIC_API_URL}/flats?limit=1000`,
@@ -43,29 +38,24 @@ export default function PaymentEntryForm() {
             headers: { Authorization: `Bearer ${token}` },
             withCredentials: true
           }
-        )
-        setFlats(data.flats || [])
+        );
+
+        setFlats(data.flats || []);
       } catch (err) {
-        console.log("Error fetching flats", err.response?.data || err)
+        console.log(err);
       }
-    }
-    fetchFlats()
-  }, [])
+    };
 
-  // When flat is selected, fetch plan by flat_type
+    fetchFlats();
+  }, []);
+
   useEffect(() => {
-    if (!selectedFlatId || flats.length === 0) return
+    if (!selectedFlatId || flats.length === 0) return;
 
-    const flat = flats.find(f => f.id === Number(selectedFlatId))
-    if (!flat) return
+    const flat = flats.find(f => f.id === Number(selectedFlatId));
+    if (!flat) return;
 
-    setFlatType(flat.flat_type)
-
-    const token = localStorage.getItem("token")
-    if (!token) {
-      console.log("❌ No token found, please login first")
-      return
-    }
+    const token = localStorage.getItem("token");
 
     const fetchPlan = async () => {
       try {
@@ -75,118 +65,140 @@ export default function PaymentEntryForm() {
             headers: { Authorization: `Bearer ${token}` },
             withCredentials: true
           }
-        )
+        );
 
         if (data.success && data.plan) {
-          setPlanName(data.plan.plan_name)  // auto-fill plan name
-          setAmount(data.plan.amount)       // auto-fill amount
-          setPlanId(data.plan.id)           // ✅ store plan_id for payload
+          setPlanName(data.plan.plan_name);
+          setAmount(data.plan.amount);
+          setPlanId(data.plan.id);
         }
       } catch (err) {
-        console.log("Error fetching plan for flat type:", err.response?.data || err)
-        setPlanName("")
-        setAmount("")
-        setPlanId(null)
+        setPlanName("");
+        setAmount("");
+        setPlanId(null);
       }
-    }
+    };
 
-    fetchPlan()
-  }, [selectedFlatId, flats])
+    fetchPlan();
+  }, [selectedFlatId, flats]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
+
     if (!selectedFlatId || !planId || !month || !method) {
-      alert("Please fill all fields")
-      return
+      toast.error("Fill all fields");
+      return;
     }
 
     const payload = {
       flat_id: Number(selectedFlatId),
-      plan_id: Number(planId),       // ✅ send correct plan_id
+      plan_id: Number(planId),
       month: Number(month),
       year: currentYear,
       payment_mode: method
-    }
+    };
 
-    setLoading(true)
+    setLoading(true);
+    const toastId = toast.loading("Recording payment...");
+
     try {
-      const { data } = await axios.post(
+      await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/pay`,
         payload,
         { withCredentials: true }
-      )
-      alert("Payment successful ✅")
-      setSelectedFlatId("")
-      setPlanName("")
-      setPlanId(null)
-      setAmount("")
-      setMonth("")
-      setMethod("")
+      );
+
+      toast.success("Payment successful", { id: toastId });
+
+      setSelectedFlatId("");
+      setPlanName("");
+      setPlanId(null);
+      setAmount("");
+      setMonth("");
+      setMethod("");
     } catch (err) {
-      console.log("Payment error:", err.response?.data || err)
-      alert(err.response?.data?.message || "Payment failed")
+      toast.error(err.response?.data?.message || "Payment failed", { id: toastId });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <Card className="max-w-xl">
+    <Card className="admin-card max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>Record Payment</CardTitle>
+        <CardTitle className="text-[#2d3436] text-xl">
+          Record Payment
+        </CardTitle>
       </CardHeader>
+
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Flat ID */}
-          <Select value={selectedFlatId} onValueChange={setSelectedFlatId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select Flat" />
-            </SelectTrigger>
-            <SelectContent>
-              {flats.map(flat => (
-                <SelectItem key={flat.id} value={String(flat.id)}>
-                  {flat.flat_number} ({flat.block})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <form onSubmit={handleSubmit} className="space-y-5">
 
-          {/* Auto-filled Plan Name */}
-          <Input value={planName} readOnly placeholder="Plan (BHK)" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select value={selectedFlatId} onValueChange={setSelectedFlatId}>
+              <SelectTrigger className="admin-select-trigger">
+                <SelectValue placeholder="Select Flat" />
+              </SelectTrigger>
+              <SelectContent className="admin-select-content">
+                {flats.map(flat => (
+                  <SelectItem key={flat.id} value={String(flat.id)}>
+                    {flat.flat_number} ({flat.block})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {/* Auto-filled Monthly Rate */}
-          <Input value={amount} readOnly placeholder="Monthly Rate" />
+            <Input
+              value={planName}
+              readOnly
+              placeholder="Plan"
+              className="admin-input"
+            />
+          </div>
 
-          {/* Month */}
-          <Select value={month} onValueChange={setMonth}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select Month" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => (
-                <SelectItem key={i + 1} value={String(i + 1)}>
-                  {new Date(0, i).toLocaleString("default", { month: "long" })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              value={amount}
+              readOnly
+              placeholder="Monthly Rate"
+              className="admin-input"
+            />
 
-          {/* Payment Method */}
+            <Select value={month} onValueChange={setMonth}>
+              <SelectTrigger className="admin-select-trigger">
+                <SelectValue placeholder="Select Month" />
+              </SelectTrigger>
+              <SelectContent className="admin-select-content">
+                {Array.from({ length: 12 }, (_, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    {new Date(0, i).toLocaleString("default", {
+                      month: "long"
+                    })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <Select value={method} onValueChange={setMethod}>
-            <SelectTrigger>
+            <SelectTrigger className="admin-select-trigger">
               <SelectValue placeholder="Payment Method" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="admin-select-content">
               <SelectItem value="cash">Cash</SelectItem>
               <SelectItem value="upi">UPI</SelectItem>
             </SelectContent>
           </Select>
 
-          <Button className="w-full" disabled={loading}>
+          <Button
+            className="admin-btn-primary w-full"
+            disabled={loading}
+          >
             {loading ? "Processing..." : "Record Payment"}
           </Button>
+
         </form>
       </CardContent>
     </Card>
-  )
+  );
 }

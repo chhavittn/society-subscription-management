@@ -8,6 +8,7 @@ import SubscriptionTable from "./SubscriptionTable"
 export default function SubscriptionsPage() {
 
   const [plans, setPlans] = useState([])
+
   const handlePlanUpdated = (updatedPlan) => {
     setPlans(prev =>
       prev.map(p => (p.id === updatedPlan.id ? updatedPlan : p))
@@ -32,23 +33,24 @@ export default function SubscriptionsPage() {
   }, [])
 
   return (
-    <div className="space-y-6">
-
+    <div className="admin-page">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">
+        <h1 className="admin-title">
           Subscription Plans
         </h1>
       </div>
 
-      <p className="text-gray-500">
+      <p className="admin-subtitle">
         Manage monthly maintenance charges based on flat types.
       </p>
 
-      <SubscriptionTable
-        plans={plans}
-        fetchPlans={fetchPlans}
-        onPlanUpdated={(updatedPlan) => handlePlanUpdated(updatedPlan)}
-      />
+      <div className="admin-surface">
+        <SubscriptionTable
+          plans={plans}
+          fetchPlans={fetchPlans}
+          onPlanUpdated={(updatedPlan) => handlePlanUpdated(updatedPlan)}
+        />
+      </div>
 
     </div>
   )

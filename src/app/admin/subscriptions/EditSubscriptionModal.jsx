@@ -11,27 +11,28 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import toast from "react-hot-toast"
 
 export default function EditSubscriptionModal({ plan, onUpdated }) {
 
   const [open, setOpen] = useState(false)
-
   const [amount, setAmount] = useState(plan?.amount || "")
 
-  // Function to get first day of next month
   const getNextMonthFirstDay = () => {
     const today = new Date()
     const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1)
-    return nextMonth.toISOString().split("T")[0] // YYYY-MM-DD
+    return nextMonth.toISOString().split("T")[0]
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
+    const toastId = toast.loading("Updating rate...")
+
     try {
       const payload = {
         amount: Number(amount),
-        effective_from: getNextMonthFirstDay() // Automatically next month 1st
+        effective_from: getNextMonthFirstDay()
       }
 
       const { data } = await axios.put(
@@ -40,14 +41,18 @@ export default function EditSubscriptionModal({ plan, onUpdated }) {
         { withCredentials: true }
       )
 
-      alert("Updated successfully ✅")
+      toast.success("Updated successfully", { id: toastId })
       setOpen(false)
+
       if (data.success && data.plan) {
         onUpdated?.(data.plan, true)
       }
+
     } catch (error) {
-      console.log(error)
-      alert(error.response?.data?.message || "Update failed")
+      toast.error(
+        error.response?.data?.message || "Update failed",
+        { id: toastId }
+      )
     }
   }
 
@@ -55,48 +60,64 @@ export default function EditSubscriptionModal({ plan, onUpdated }) {
     <Dialog open={open} onOpenChange={setOpen}>
 
       <DialogTrigger asChild>
-        <Button size="sm">Edit</Button>
+        <Button
+          size="sm"
+          className="admin-btn-primary"
+        >
+          Edit
+        </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-md">
+      <DialogContent className="admin-modal max-w-md">
 
         <DialogHeader>
-          <DialogTitle>Update Rate</DialogTitle>
+          <DialogTitle className="text-[#2d3436]">
+            Update Rate
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Flat Type (READ ONLY) */}
           <div>
-            <label className="text-sm font-medium">Flat Type</label>
+            <label className="text-sm font-medium text-[#636e72]">
+              Flat Type
+            </label>
             <Input
               value={plan?.plan_name || plan?.flat_type || ""}
               disabled
+              className="admin-input"
             />
           </div>
 
-          {/* Amount (Editable) */}
           <div>
-            <label className="text-sm font-medium">Monthly Rate</label>
+            <label className="text-sm font-medium text-[#636e72]">
+              Monthly Rate
+            </label>
             <Input
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               required
+              className="admin-input"
             />
           </div>
 
-          {/* Effective From (Read Only) */}
           <div>
-            <label className="text-sm font-medium">Effective From</label>
+            <label className="text-sm font-medium text-[#636e72]">
+              Effective From
+            </label>
             <Input
               type="date"
               value={getNextMonthFirstDay()}
               disabled
+              className="admin-input"
             />
           </div>
 
-          <Button type="submit" className="w-full">
+          <Button
+            type="submit"
+            className="admin-btn-primary w-full"
+          >
             Update Rate
           </Button>
 

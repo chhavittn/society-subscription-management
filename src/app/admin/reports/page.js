@@ -4,15 +4,19 @@ import DownloadButtons from "./DownloadButtons"
 
 export default function ReportsPage() {
   return (
-    <div className="space-y-8">
+    <div className="admin-page space-y-8">
+      <div>
+        <h1 className="admin-title mb-2">
+          Financial Reports
+        </h1>
+      </div>
 
-      <h1 className="text-3xl font-bold">
-        Financial Reports
-      </h1>
-
-      <ReportsSummary />
-      <PaymentModeChart />
-      <DownloadButtons />
+      <div className="admin-surface space-y-8">
+        <ReportsSummary />
+        <PaymentModeChart />
+        {/* <RevenueOverTimeChart /> */}
+        <DownloadButtons />
+      </div>
 
     </div>
   )

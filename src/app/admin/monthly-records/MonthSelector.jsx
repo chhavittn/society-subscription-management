@@ -1,146 +1,3 @@
-// "use client";
-
-// import { useState, useEffect, useCallback } from "react";
-// import axios from "axios";
-// import {
-//   Select,
-//   SelectContent,
-//   SelectItem,
-//   SelectTrigger,
-//   SelectValue
-// } from "@/components/ui/select";
-// import { Button } from "@/components/ui/button";
-// import { Badge } from "@/components/ui/badge";
-
-// export default function MonthlyRecordsTable() {
-//   const today = new Date();
-//   const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-//   const [month, setMonth] = useState(currentMonth);
-//   const [records, setRecords] = useState([]);
-//   const [loading, setLoading] = useState(false);
-
-//   // 🔹 Fetch records
-//   const fetchRecords = useCallback(async () => {
-//     if (!month) return;
-//     try {
-//       setLoading(true);
-//       const { data } = await axios.get(
-//         `${process.env.NEXT_PUBLIC_API_URL}/admin/subscriptions/${month}`,
-//         { withCredentials: true }
-//       );
-//       setRecords(data.subscriptions || []);
-//     } catch (err) {
-//       console.error("Error fetching subscriptions:", err);
-//       setRecords([]);
-//     } finally {
-//       setLoading(false);
-//     }
-//   }, [month]);
-
-//   useEffect(() => {
-//     fetchRecords();
-//   }, [fetchRecords]);
-
-//   // 🔹 Mark as paid (create if missing)
-//   const markAsPaid = async (record) => {
-//     try {
-//       const [year, monthNum] = month.split("-");
-
-//       if (!record.subscription_id || record.subscription_id === 0) {
-//         const res = await axios.post(
-//           `${process.env.NEXT_PUBLIC_API_URL}/admin/subscription`,
-//           {
-//             flat_id: record.flat_id,
-//             plan_id: record.plan_id || 1,
-//             amount: record.amount || 2200,
-//             month: Number(monthNum),
-//             year: Number(year),
-//             due_date: record.due_date,
-//             status: "paid"
-//           },
-//           { withCredentials: true }
-//         );
-//         record.subscription_id = res.data.subscription.id;
-//       } else {
-//         await axios.put(
-//           `${process.env.NEXT_PUBLIC_API_URL}/admin/subscription/${record.subscription_id}`,
-//           { status: "paid" },
-//           { withCredentials: true }
-//         );
-//       }
-
-//       setRecords(prev =>
-//         prev.map(r => r.flat_id === record.flat_id ? { ...r, status: "paid", subscription_id: record.subscription_id } : r)
-//       );
-//     } catch (err) {
-//       console.error("Failed to mark paid:", err);
-//     }
-//   };
-
-//   const getStatusBadge = (status) => {
-//     const s = status?.trim().toLowerCase();
-//     if (s === "paid") return <Badge>Paid</Badge>;
-//     if (s === "overdue") return <Badge variant="destructive">Overdue</Badge>;
-//     return <Badge variant="secondary">Pending</Badge>;
-//   };
-
-//   return (
-//     <div className="space-y-6">
-//       <Select value={month} onValueChange={setMonth}>
-//         <SelectTrigger className="w-60">
-//           <SelectValue placeholder="Select Month" />
-//         </SelectTrigger>
-//         <SelectContent>
-//           {Array.from({ length: 12 }, (_, i) => {
-//             const m = String(i + 1).padStart(2, "0");
-//             return (
-//               <SelectItem key={m} value={`${today.getFullYear()}-${m}`}>
-//                 {new Date(today.getFullYear(), i).toLocaleString("default", { month: "long" })} {today.getFullYear()}
-//               </SelectItem>
-//             );
-//           })}
-//         </SelectContent>
-//       </Select>
-
-//       {loading && <p>Loading records...</p>}
-//       {!loading && records.length === 0 && <p>No records found for this month.</p>}
-
-//       {!loading && records.length > 0 && (
-//         <table className="w-full border rounded">
-//           <thead className="bg-gray-100">
-//             <tr>
-//               <th className="p-3 text-left">Flat</th>
-//               <th className="p-3 text-left">Owner</th>
-//               <th className="p-3 text-left">Status</th>
-//               <th className="p-3 text-left">Action</th>
-//             </tr>
-//           </thead>
-//           <tbody>
-//             {records.map(record => {
-//               const status = record.status?.trim().toLowerCase();
-//               return (
-//                 <tr key={record.flat_id} className="border-t">
-//                   <td className="p-3">{record.flat_number} ({record.block})</td>
-//                   <td className="p-3">{record.user_name}</td>
-//                   <td className="p-3">{getStatusBadge(record.status)}</td>
-//                   <td className="p-3">
-//                     {["pending", "overdue"].includes(status) && (
-//                       <Button size="sm" onClick={() => markAsPaid(record)}>
-//                         Mark Paid
-//                       </Button>
-//                     )}
-//                   </td>
-//                 </tr>
-//               );
-//             })}
-//           </tbody>
-//         </table>
-//       )}
-//     </div>
-//   );
-// }
-
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -154,16 +11,35 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import toast from "react-hot-toast";
 
 export default function MonthlyRecordsTable() {
   const today = new Date();
-  const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const currentMonth = `${today.getFullYear()}-${String(
+    today.getMonth() + 1
+  ).padStart(2, "0")}`;
 
   const [month, setMonth] = useState(currentMonth);
   const [records, setRecords] = useState([]);
+  const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // 🔹 Fetch all flats + subscriptions for selected month
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // 🔹 Debounce Search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // 🔹 Fetch Data
   const fetchRecords = useCallback(async () => {
     try {
       setLoading(true);
@@ -173,10 +49,8 @@ export default function MonthlyRecordsTable() {
         { withCredentials: true }
       );
 
-      // Filter out flats with no user assigned
       const filtered = (data.subscriptions || []).filter(r => r.user_id);
 
-      // Show pending by default if subscription doesn't exist
       const allFlats = filtered.map(r => ({
         ...r,
         status: r.status || "pending",
@@ -185,7 +59,7 @@ export default function MonthlyRecordsTable() {
 
       setRecords(allFlats);
     } catch (err) {
-      console.error("Error fetching subscriptions:", err);
+      console.error(err);
       setRecords([]);
     } finally {
       setLoading(false);
@@ -196,8 +70,28 @@ export default function MonthlyRecordsTable() {
     fetchRecords();
   }, [fetchRecords]);
 
-  // 🔹 Mark as Paid (create subscription if missing)
+  // 🔹 Apply Search Filter
+  useEffect(() => {
+    const filtered = records.filter(r =>
+      r.user_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      r.flat_number?.toString().includes(debouncedSearch)
+    );
+
+    setFilteredRecords(filtered);
+  }, [records, debouncedSearch]);
+
+  // 🔹 Pagination Logic
+  const totalPages = Math.ceil(filteredRecords.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const currentData = filteredRecords.slice(
+    startIndex,
+    startIndex + rowsPerPage
+  );
+
+  // 🔹 Mark Paid
   const markAsPaid = async (record) => {
+    const toastId = toast.loading("Marking payment as paid...");
+
     try {
       const [year, monthNum] = month.split("-");
 
@@ -214,7 +108,9 @@ export default function MonthlyRecordsTable() {
         },
         { withCredentials: true }
       );
-      record.subscription_id = res.data?.subscription?.id || record.subscription_id;
+
+      record.subscription_id =
+        res.data?.subscription?.id || record.subscription_id;
 
       setRecords(prev =>
         prev.map(r =>
@@ -223,75 +119,155 @@ export default function MonthlyRecordsTable() {
             : r
         )
       );
+      toast.success("Payment marked as paid", { id: toastId });
     } catch (err) {
-      console.error("Failed to mark paid:", err);
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to mark payment as paid", {
+        id: toastId,
+      });
     }
   };
 
-  // 🔹 Status badge
   const getStatusBadge = (status) => {
     const s = status?.trim().toLowerCase();
-    if (s === "paid") return <Badge>Paid</Badge>;
-    if (s === "overdue") return <Badge variant="destructive">Overdue</Badge>;
-    return <Badge variant="secondary">Pending</Badge>;
+    if (s === "paid")
+      return <Badge className="admin-badge-paid">Paid</Badge>;
+    if (s === "overdue")
+      return <Badge className="admin-badge-overdue">Overdue</Badge>;
+    return <Badge className="admin-badge-pending">Pending</Badge>;
   };
 
   return (
     <div className="space-y-6">
-      {/* Month selector */}
-      <Select value={month} onValueChange={setMonth}>
-        <SelectTrigger className="w-60">
-          <SelectValue placeholder="Select Month" />
-        </SelectTrigger>
-        <SelectContent>
-          {Array.from({ length: 12 }, (_, i) => {
-            const m = String(i + 1).padStart(2, "0");
-            return (
-              <SelectItem key={m} value={`${today.getFullYear()}-${m}`}>
-                {new Date(today.getFullYear(), i).toLocaleString("default", { month: "long" })}{" "}
-                {today.getFullYear()}
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
-
-      {/* Loading */}
-      {loading && <p>Loading records...</p>}
-      {!loading && records.length === 0 && <p>No records found for this month.</p>}
-
-      {/* Table */}
-      {!loading && records.length > 0 && (
-        <table className="w-full border rounded">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-3 text-left">Flat</th>
-              <th className="p-3 text-left">Owner</th>
-              <th className="p-3 text-left">Status</th>
-              <th className="p-3 text-left">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {records.map(record => {
-              const status = record.status?.trim().toLowerCase();
+      <div className="flex flex-wrap gap-4 justify-between items-center">
+        <Select value={month} onValueChange={setMonth}>
+          <SelectTrigger className="admin-select-trigger w-60">
+            <SelectValue placeholder="Select Month" />
+          </SelectTrigger>
+          <SelectContent className="admin-select-content">
+            {Array.from({ length: 12 }, (_, i) => {
+              const m = String(i + 1).padStart(2, "0");
               return (
-                <tr key={record.flat_id} className="border-t">
-                  <td className="p-3">{record.flat_number} ({record.block})</td>
-                  <td className="p-3">{record.user_name}</td>
-                  <td className="p-3">{getStatusBadge(record.status)}</td>
-                  <td className="p-3">
-                    {["pending", "overdue"].includes(status) && (
-                      <Button size="sm" onClick={() => markAsPaid(record)}>
-                        Mark Paid
-                      </Button>
-                    )}
-                  </td>
-                </tr>
+                <SelectItem key={m} value={`${today.getFullYear()}-${m}`}>
+                  {new Date(today.getFullYear(), i).toLocaleString("default", {
+                    month: "long"
+                  })}{" "}
+                  {today.getFullYear()}
+                </SelectItem>
               );
             })}
-          </tbody>
-        </table>
+          </SelectContent>
+        </Select>
+
+        <input
+          placeholder="Search flat / owner..."
+          className="admin-input w-64"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      {loading && <p className="text-[#2d3436]">Loading records...</p>}
+
+      {!loading && filteredRecords.length > 0 && (
+        <div className="admin-table-wrap">
+          <div className="max-h-[500px] overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="admin-table-head sticky top-0">
+                <tr className="admin-table-head-row">
+                  <th className="p-3 text-left">Flat</th>
+                  <th className="p-3 text-left">Owner</th>
+                  <th className="p-3 text-left">Status</th>
+                  <th className="p-3 text-left">Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {currentData.map((record, index) => {
+                  const status = record.status?.toLowerCase();
+
+                  return (
+                    <tr
+                      key={record.flat_id}
+                      className={`border-t border-[#dfe6e9] ${
+                        index % 2 === 0 ? "admin-row-even" : "admin-row-odd"
+                      } admin-row-hover`}
+                    >
+                      <td className="p-3 text-[#2d3436]">
+                        {record.flat_number} ({record.block})
+                      </td>
+                      <td className="p-3 text-[#636e72]">{record.user_name}</td>
+                      <td className="p-3">
+                        {getStatusBadge(record.status)}
+                      </td>
+                      <td className="p-3">
+                        {["pending", "overdue"].includes(status) && (
+                          <Button
+                            size="sm"
+                            className="admin-btn-primary"
+                            onClick={() => markAsPaid(record)}
+                          >
+                            Mark Paid
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+
+            </table>
+          </div>
+        </div>
       )}
+
+      {!loading && filteredRecords.length === 0 && (
+        <p className="text-[#636e72]">No records found</p>
+      )}
+
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[#2d3436]">Rows:</span>
+          <select
+            className="admin-native-select px-2 py-1"
+            value={rowsPerPage}
+            onChange={(e) => {
+              setRowsPerPage(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => prev - 1)}
+            className="admin-btn-warm"
+          >
+            Prev
+          </Button>
+
+          <span className="text-[#2d3436]">
+            Page {currentPage} of {totalPages || 1}
+          </span>
+
+          <Button
+            size="sm"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            className="admin-btn-warm"
+          >
+            Next
+          </Button>
+        </div>
+
+      </div>
+
     </div>
   );
 }

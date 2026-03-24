@@ -5,16 +5,12 @@ import axios from "axios"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
 
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
+const COLORS = ["#0984e3", "#00cec9", "#6c5ce7", "#e84393", "#fdcb6e"]
 
 export function PaymentModeChart() {
   const [data, setData] = useState([])
 
-  useEffect(() => {
-    fetchPaymentModes()
-  }, [])
-
-  const fetchPaymentModes = async () => {
+  async function fetchPaymentModes() {
     try {
       const token = localStorage.getItem("token")
       if (!token) return console.log("❌ No token found")
@@ -37,23 +33,21 @@ export function PaymentModeChart() {
         page += 1
       }
 
-      // ✅ Defensive normalization
       const modeMap = {}
       allPayments.forEach(p => {
         const status = (p.status || "").toLowerCase()
         if (!(status === "paid" || status === "success")) return
 
-        let mode = (p.payment_mode || "Unknown").trim() // remove spaces
+        let mode = (p.payment_mode || "Unknown").trim()
         if (!mode) mode = "Unknown"
-        mode = mode.toLowerCase() // unify casing
+        mode = mode.toLowerCase()
 
         if (!modeMap[mode]) modeMap[mode] = 0
         modeMap[mode] += parseFloat(p.amount) || 0
       })
 
-      // Convert to chart-friendly array and capitalize names
       const chartData = Object.entries(modeMap).map(([key, value]) => ({
-        name: key.charAt(0).toUpperCase() + key.slice(1), // Capitalized: Cash, UPI
+        name: key.charAt(0).toUpperCase() + key.slice(1),
         value
       }))
 
@@ -63,21 +57,44 @@ export function PaymentModeChart() {
     }
   }
 
+  useEffect(() => {
+    fetchPaymentModes()
+  }, [])
+
   return (
-    <Card>
+    <Card className="admin-card">
       <CardHeader>
-        <CardTitle>Payment Mode Breakdown</CardTitle>
+        <CardTitle className="text-[#2d3436]">
+          Payment Mode Breakdown
+        </CardTitle>
       </CardHeader>
+
       <CardContent>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={data} dataKey="value" nameKey="name" outerRadius={100} label>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                outerRadius={100}
+                label={{ fill: "#636e72", fontSize: 12 }}
+              >
                 {data.map((entry, index) => (
                   <Cell key={index} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => `₹${value.toLocaleString("en-IN")}`} />
+
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid rgba(9, 132, 227, 0.15)",
+                  borderRadius: "10px"
+                }}
+                formatter={(value) =>
+                  `₹${value.toLocaleString("en-IN")}`
+                }
+              />
             </PieChart>
           </ResponsiveContainer>
         </div>

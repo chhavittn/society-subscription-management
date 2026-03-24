@@ -7,15 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 export default function StatsCards() {
   const [stats, setStats] = useState([])
 
-  useEffect(() => {
-    fetchStats()
-  }, [])
-
-  const fetchStats = async () => {
+  async function fetchStats() {
     try {
       const token = localStorage.getItem("token")
 
-      // 🔹 Fetch all subscriptions for all months
       const res = await axios.get(
         "http://localhost:5000/api/v1/admin/subscriptions/all",
         {
@@ -30,27 +25,22 @@ export default function StatsCards() {
       const currentMonth = currentDate.getMonth() + 1
       const currentYear = currentDate.getFullYear()
 
-      // Sets for unique flats
       const flatsSet = new Set()
       let totalCollected = 0
       let pendingAmount = 0
       let monthlyCollection = 0
 
       subscriptions.forEach(sub => {
-        // Unique flats
         if (sub.flat_number) flatsSet.add(sub.flat_number)
 
-        // Total collected = paid subscriptions
         if (sub.status?.toLowerCase() === "paid") {
           totalCollected += Number(sub.amount) || 0
         }
 
-        // Pending subscriptions
         if (sub.status?.toLowerCase() === "pending") {
           pendingAmount += Number(sub.amount) || 0
         }
 
-        // Monthly collection
         if (
           Number(sub.month) === currentMonth &&
           Number(sub.year) === currentYear &&
@@ -73,17 +63,26 @@ export default function StatsCards() {
     }
   }
 
+  useEffect(() => {
+    fetchStats()
+  }, [])
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
       {stats.map((stat, index) => (
-        <Card key={index}>
+        <Card
+          key={index}
+          className="admin-card hover:scale-[1.02]"
+        >
           <CardHeader>
-            <CardTitle className="text-sm text-gray-500">
+            <CardTitle className="text-sm text-[#636e72]">
               {stat.title}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stat.value}</p>
+            <p className="text-2xl font-bold text-[#2d3436]">
+              {stat.value}
+            </p>
           </CardContent>
         </Card>
       ))}

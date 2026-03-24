@@ -1,102 +1,100 @@
-"use client"
-import React, { useState, useEffect } from "react"
-import { useSelector, useDispatch } from "react-redux"
-import { logout } from "@/redux/slices/authSlice"
-import { useSession, signOut } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
+"use client";
+
+import Link from "next/link";
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useSession, signOut } from "next-auth/react";
+import { Menu, LogOut } from "lucide-react";
+import { loadUser, logout } from "@/redux/slices/authSlice";
 import Notifications from "../user/dashboard/Notifications";
-import { loadUser } from "../../redux/slices/authSlice";
+import { toast } from "react-hot-toast";
 
-export default function Navbar() {
-  const { data: session, status } = useSession()
-  const { user, isAuthenticated } = useSelector((state) => state.auth)
-  const dispatch = useDispatch()
-  const router = useRouter()
-  const [token, setToken] = useState(null);
+export default function Navbar({ onMenuClick }) {
+  const { data: session, status } = useSession();
+  const { user, isAuthenticated, loading } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
 
-
-  useEffect(() => {
-    const t = localStorage.getItem("token");
-    setToken(t);
-  }, []);
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   useEffect(() => {
-    if (!user && token) {
+    if (token && !user && !loading) {
       dispatch(loadUser());
     }
-  }, [dispatch, user, token]);
+  }, [dispatch, token, user, loading]);
 
+  if (status === "loading" || loading) return null;
 
-  if (status === "loading") return null
-
-  const userData = session?.user || user || {};
-  // console.log(session?.user, user, userData);
-
+  const userData = user || session?.user || {};
+  const role = user?.role ?? session?.user?.role ?? "resident";
+  const roleLabel = role === "admin" ? "Admin" : "Resident";
 
   const handleLogout = async () => {
-    dispatch(logout());
-    await signOut({ callbackUrl: "/login" });
+    try {
+      dispatch(logout());
+      toast.success("Logged out successfully");
+      await signOut({ callbackUrl: "/login" });
+    } catch (error) {
+      toast.error("Failed to logout");
+      console.error(error);
+    }
   };
 
   return (
-    <nav className="flex justify-between items-center bg-gray-900 text-white px-6 py-3 shadow">
+    <nav className="app-navbar">
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="app-hamburger lg:hidden"
+          aria-label="Toggle sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
 
-      <h1 className="font-semibold text-lg tracking-wide">
-        Dashboard
-      </h1>
-      <div className="flex items-center gap-4">
-        {(session || isAuthenticated) && token && (  // only render Notifications if token exists
-          <>
-            <Notifications token={token} />
-          </>
-        )}
-        {!token && <p>Loading...</p>}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="truncate text-lg font-semibold text-[#2d3436] sm:text-xl">
+              Welcome back, {userData?.name || "Member"}
+            </h1>
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-4">
+
+      <div className="flex items-center gap-3 sm:gap-4">
+        {(session || isAuthenticated) && token ? (
+          <Notifications token={token} />
+        ) : null}
+
         {(session || isAuthenticated) ? (
-          <div className="flex items-center gap-6">
-            <span className="text-sm font-semibold text-gray-200">
-              {userData?.role || "NO"}
-            </span>
-            <div className="flex items-center gap-3">
-
-              <div className="hidden flex-col items-end sm:flex">
-
-                <span className="text-sm font-semibold text-gray-200">
-                  {userData?.name || "User"}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {userData?.email || "Member"}
-                </span>
-              </div>
-
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-700 border border-gray-600 text-sm font-bold text-white">
-                {userData?.name ? userData.name.charAt(0).toUpperCase() : "U"}
-              </div>
-
+          <div className="flex items-center gap-3 rounded-full border border-[#dfe6e9] bg-[#f4faf9] px-3 py-2">
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-semibold text-[#2d3436]">
+                {userData?.name || "User"}
+              </p>
+              <p className="text-xs text-[#636e72]">
+                {userData?.email || "Member"}
+              </p>
             </div>
 
-            <div className="h-6 w-px bg-gray-600 hidden sm:block"></div>
+            <span className="rounded-full bg-[#00cec9] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+              {roleLabel}
+            </span>
 
             <button
               onClick={handleLogout}
-              className="rounded-md px-4 py-2 text-sm font-medium text-gray-200 transition hover:bg-red-500 hover:text-white"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#d63031] text-white transition hover:opacity-95"
+              aria-label="Logout"
             >
-              Logout
+              <LogOut className="h-4 w-4" />
             </button>
-
           </div>
         ) : (
-          <Link
-            href="/login"
-            className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
-          >
+          <Link href="/login" className="admin-btn-primary rounded-xl px-5 py-2.5 text-sm font-semibold">
             Login
           </Link>
         )}
       </div>
-
     </nav>
-  )
+  );
 }

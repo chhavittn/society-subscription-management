@@ -2,20 +2,15 @@ const express = require("express");
 const app = express();
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
-const dotenv = require("dotenv");
-
-dotenv.config({ path: "backend/.env" });
 
 // CORS configuration (for Next.js frontend)
-app.use(
-  cors({
-    origin: "http://localhost:3000",
+app.use( cors({
+    origin: process.env.FRONTEND_URL,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));

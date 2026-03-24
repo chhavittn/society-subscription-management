@@ -328,7 +328,7 @@ exports.getSubscriptionByMonth = async (req, res) => {
 
     // 🔹 Step 0: Get user's flat
     const flatRes = await pool.query(
-      `SELECT id, plan_id, flat_number, flat_type FROM flats WHERE user_id=$1 AND is_active=true`,
+      `SELECT id, plan_id, flat_number, flat_type, block FROM flats WHERE user_id=$1 AND is_active=true`,
       [req.user.id]
     );
     const flat = flatRes.rows[0];
@@ -569,8 +569,10 @@ exports.getSubscriptionByMonth = async (req, res) => {
       year: subscription.year,
       amount: subscription.amount,
       status: subscription.payment_status,
+      flat_type: flat.flat_type || requestedPlan?.plan_name || currentPlan.plan_name || "Maintenance",
+      plan_name: requestedPlan?.plan_name || currentPlan.plan_name || flat.flat_type || "Maintenance",
       flat_number: flat.flat_number,
-      block: "N/A",
+      block: flat.block || "N/A",
       user_name: req.user.name,
       payment_mode: subscription.payment_mode,
       transaction_id: subscription.transaction_id,

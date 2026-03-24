@@ -1,26 +1,54 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-export default function UserSidebar() {
-const currentDate = new Date();
-const month = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`;
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  CreditCard,
+  House,
+  LayoutDashboard,
+  ReceiptText,
+  UserRound,
+} from "lucide-react";
+
+export default function UserSidebar({ onNavigate }) {
+  const pathname = usePathname();
+  const currentDate = new Date();
+  const month = `${currentDate.getFullYear()}-${String(
+    currentDate.getMonth() + 1
+  ).padStart(2, "0")}`;
+
+  const links = [
+    { label: "Dashboard", href: "/user/dashboard", icon: LayoutDashboard },
+    { label: "Subscriptions", href: "/user/subscriptions", icon: House },
+    {
+      label: "Monthly Details",
+      href: `/user/subscriptions/${month}`,
+      icon: ReceiptText,
+    },
+    { label: "My Payments", href: "/user/payments", icon: CreditCard },
+    { label: "Profile", href: "/profile", icon: UserRound },
+  ];
+
   return (
-    <div className="w-64 h-screen bg-gray-800 text-white p-5">
-      <h2 className="text-xl font-bold mb-6">User Panel</h2>
-      <ul className="space-y-4">
-        <li><Link href="/user/dashboard">Dashboard</Link></li>
-        <li>
-          <Link href="/user/subscriptions">Subscriptions</Link>
-        </li>
-        <li>
-          <Link href={`/user/subscriptions/${month}`}>
-            Monthly Subscription Details
-          </Link>
-        </li>
-        <li><Link href="/user/payments">My Payments</Link></li>
-        <li><Link href="/profile">Profile</Link></li>
-      </ul>
+    <div className="flex h-full flex-col">
+      <div className="space-y-1">
+        {links.map((link) => {
+          const Icon = link.icon;
+          const isActive = pathname === link.href;
 
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={onNavigate}
+              className={`app-sidebar-link ${isActive ? "app-sidebar-link-active" : ""}`}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span>{link.label}</span>
+            </Link>
+          );
+        })}
+      </div>
     </div>
-  )
+  );
 }

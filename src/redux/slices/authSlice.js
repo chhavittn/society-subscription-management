@@ -6,12 +6,10 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async (data, thunkAPI) => {
-    console.log(data);
     try {
       const res = await axios.post(`${API}/login`, data, {
         withCredentials: true
       });
-      localStorage.setItem("token", data.token);
       return res.data;
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response.data);
@@ -88,7 +86,9 @@ const authSlice = createSlice({
       .addCase(loadUser.rejected, (state) => {
         state.loading = false;
         state.user = null;
+        state.token = null;
         state.isAuthenticated = false;
+        localStorage.removeItem("token");
       });
   },
 });

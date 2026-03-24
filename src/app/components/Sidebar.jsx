@@ -1,39 +1,45 @@
-"use client"
+"use client";
 
-import { useSelector } from "react-redux"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { useSession } from "next-auth/react"
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { loadUser } from "@/redux/slices/authSlice";
+import AdminSidebar from "./AdminSidebar";
+import UserSidebar from "./UserSidebar";
+import ProtectedRoute from "./ProtectedRoute";
 
-import AdminSidebar from "./AdminSidebar"
-import UserSidebar from "./UserSidebar"
+export default function Sidebar({ onNavigate }) {
+  const router = useRouter();
+  const dispatch = useDispatch();
+  const { data: session, status } = useSession();
+  const { isAuthenticated, user, loading } = useSelector((state) => state.auth);
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-export default function Sidebar() {
-
-  const router = useRouter()
-
-  const { data: session, status } = useSession()
-  const { isAuthenticated, user } = useSelector((state) => state.auth)
-
-  const role = user?.role || session?.user?.role || "user"
+  const role = user?.role ?? session?.user?.role;
 
   useEffect(() => {
+    if (token && !user && !loading) {
+      dispatch(loadUser());
+    }
+  }, [dispatch, token, user, loading]);
 
-    if (status === "loading") return
+  useEffect(() => {
+    if (status === "loading" || loading) return;
 
     if (!session && !isAuthenticated) {
-      router.push("/login")
+      router.push("/login");
     }
+  }, [session, status, isAuthenticated, loading, router]);
 
-  }, [session, status, isAuthenticated, router])
-
-  if (status === "loading") return null
-
-  if (!session && !isAuthenticated) return null
+  if (status === "loading" || loading) return null;
+  if (!session && !isAuthenticated) return null;
+  if (token && !user) return null;
 
   if (role === "admin") {
-    return <AdminSidebar />
+    return <AdminSidebar onNavigate={onNavigate} />;
   }
 
-  return <UserSidebar />
+  return <UserSidebar onNavigate={onNavigate} />;
 }

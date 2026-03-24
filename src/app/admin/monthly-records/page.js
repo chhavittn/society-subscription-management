@@ -8,14 +8,20 @@ export default function MonthlyRecordsPage() {
   const [month, setMonth] = useState("")
 
   return (
-    <div className="space-y-6">
-
-      <h1 className="text-3xl font-bold">
+    <div className="admin-page">
+      <h1 className="admin-title">
         Monthly Subscription Records
       </h1>
 
-      {/* ✅ ONLY ONE SELECT HERE */}
-      <MonthSelector value={month} onChange={setMonth} />
+      <div className="admin-surface">
+        <MonthSelector value={month} onChange={setMonth} />
+      </div>
+
+      {month && (
+        <div className="admin-surface">
+          <MonthlyRecordsTable selectedMonth={month} />
+        </div>
+      )}
 
     </div>
   )

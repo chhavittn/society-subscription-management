@@ -16,16 +16,10 @@ import {
 export default function RevenueChart() {
   const [data, setData] = useState([])
 
-  useEffect(() => {
-    fetchRevenue()
-  }, [])
-
-  const fetchRevenue = async () => {
+  async function fetchRevenue() {
     try {
       const token = localStorage.getItem("token")
 
-      // /admin/payments is paginated on backend (default limit=10),
-      // so fetch all pages for complete monthly chart data.
       const pageSize = 100
       let page = 1
       let allPayments = []
@@ -46,7 +40,6 @@ export default function RevenueChart() {
         page += 1
       }
 
-      // ---- Aggregate by year-month ----
       const revenueMap = {}
 
       allPayments.forEach(p => {
@@ -65,7 +58,6 @@ export default function RevenueChart() {
         revenueMap[key] += amt
       })
 
-      // ---- Convert to chart format ----
       const months = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun",
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -85,10 +77,16 @@ export default function RevenueChart() {
     }
   }
 
+  useEffect(() => {
+    fetchRevenue()
+  }, [])
+
   return (
-    <Card>
+    <Card className="admin-card">
       <CardHeader>
-        <CardTitle>Monthly Collection</CardTitle>
+        <CardTitle className="text-[#2d3436]">
+          Monthly Collection
+        </CardTitle>
       </CardHeader>
 
       <CardContent>
@@ -96,16 +94,25 @@ export default function RevenueChart() {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
 
-              <XAxis dataKey="month" />
-              <YAxis />
+              <XAxis dataKey="month" tick={{ fill: "#636e72", fontSize: 12 }} />
+              <YAxis tick={{ fill: "#636e72", fontSize: 12 }} />
 
-              <Tooltip formatter={(val) => `₹${val}`} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid rgba(9, 132, 227, 0.15)",
+                  borderRadius: "8px"
+                }}
+                formatter={(val) => `₹${val}`}
+              />
 
               <Line
                 type="monotone"
                 dataKey="revenue"
-                stroke="#2563eb"
+                stroke="#0984e3"
                 strokeWidth={3}
+                dot={{ r: 4, fill: "#00cec9" }}
+                activeDot={{ r: 6, fill: "#6c5ce7" }}
               />
 
             </LineChart>
