@@ -53,7 +53,6 @@ export default function SubscriptionDetails() {
     }
 
     handlePrint();
-    toast.success("Receipt download started");
   };
 
   useEffect(() => {

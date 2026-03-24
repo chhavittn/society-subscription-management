@@ -2,8 +2,14 @@ const express = require("express");
 const app = express();
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+const dotenv = require("dotenv");
+require("dotenv").config();
+const {connectDatabase} = require("./db");
 
-// CORS configuration (for Next.js frontend)
+dotenv.config();
+
+connectDatabase();
+
 app.use( cors({
     origin: process.env.FRONTEND_URL,
     credentials: true,
@@ -28,5 +34,11 @@ app.use("/api/v1", flats);
 app.use("/api/v1", subscription_plan);
 app.use("/api/v1", monlthly_subscription_record);
 app.use("/api/v1", payment);
+
+
+const server = app.listen(process.env.PORT || 5000, () => {
+  console.log(`Server running on http://localhost:${process.env.PORT}`);
+});
+
 
 module.exports = app;

@@ -14,7 +14,6 @@ export default function ReportsPage() {
       <div className="admin-surface space-y-8">
         <ReportsSummary />
         <PaymentModeChart />
-        {/* <RevenueOverTimeChart /> */}
         <DownloadButtons />
       </div>
 

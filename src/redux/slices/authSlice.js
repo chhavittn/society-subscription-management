@@ -29,7 +29,7 @@ export const loadUser = createAsyncThunk(
         withCredentials: true,
       });
 
-      return res.data; // should return user
+      return res.data;
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response?.data);
     }

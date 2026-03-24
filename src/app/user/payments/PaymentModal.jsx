@@ -6,6 +6,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 
+const digitsOnly = (value) => value.replace(/\D/g, "");
+const formatExpiry = (value) => {
+  const cleaned = digitsOnly(value).slice(0, 4);
+  if (cleaned.length <= 2) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
+};
+
 export default function PaymentModal({ amount, planId, refreshPayments, flatType, month, year }) {
   const [cardNumber, setCardNumber] = useState("");
   const [name, setName] = useState("");
@@ -17,8 +26,58 @@ export default function PaymentModal({ amount, planId, refreshPayments, flatType
 
   const handlePayment = async () => {
     setError("");
-    if (!cardNumber || !name || !expiry || !cvv) {
+    const trimmedCardNumber = digitsOnly(cardNumber);
+    const trimmedName = name.trim();
+    const trimmedExpiry = expiry.trim();
+    const trimmedCvv = digitsOnly(cvv);
+
+    if (!trimmedCardNumber || !trimmedName || !trimmedExpiry || !trimmedCvv) {
       const message = "Please fill all card details";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (trimmedCardNumber.length !== 16) {
+      const message = "Card number must be exactly 16 digits";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (!/^[A-Za-z ]+$/.test(trimmedName)) {
+      const message = "Card holder name must contain letters only";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(trimmedExpiry)) {
+      const message = "Expiry must be in MM/YY format";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    const [expiryMonth, expiryYear] = trimmedExpiry.split("/");
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear() % 100;
+    const enteredMonth = Number(expiryMonth);
+    const enteredYear = Number(expiryYear);
+
+    if (
+      enteredYear < currentYear ||
+      (enteredYear === currentYear && enteredMonth < currentMonth)
+    ) {
+      const message = "Card expiry date cannot be in the past";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (trimmedCvv.length !== 3) {
+      const message = "CVV must be exactly 3 digits";
       setError(message);
       toast.error(message);
       return;
@@ -85,12 +144,38 @@ Status: Paid
               <p className="mt-1">Complete the card details below to pay for {flatType}.</p>
             </div>
 
-            <input placeholder="Card Number" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} className="admin-input w-full" />
-            <input placeholder="Card Holder Name" value={name} onChange={(e) => setName(e.target.value)} className="admin-input w-full" />
+            <input
+              placeholder="Card Number"
+              value={cardNumber}
+              inputMode="numeric"
+              maxLength={16}
+              onChange={(e) => setCardNumber(digitsOnly(e.target.value).slice(0, 16))}
+              className="admin-input w-full"
+            />
+            <input
+              placeholder="Card Holder Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="admin-input w-full"
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <input placeholder="Expiry (MM/YY)" value={expiry} onChange={(e) => setExpiry(e.target.value)} className="admin-input w-full" />
-              <input placeholder="CVV" value={cvv} onChange={(e) => setCvv(e.target.value)} className="admin-input w-full" />
+              <input
+                placeholder="Expiry (MM/YY)"
+                value={expiry}
+                inputMode="numeric"
+                maxLength={5}
+                onChange={(e) => setExpiry(formatExpiry(e.target.value))}
+                className="admin-input w-full"
+              />
+              <input
+                placeholder="CVV"
+                value={cvv}
+                inputMode="numeric"
+                maxLength={3}
+                onChange={(e) => setCvv(digitsOnly(e.target.value).slice(0, 3))}
+                className="admin-input w-full"
+              />
             </div>
 
             {error && <p className="text-sm text-[#d63031]">{error}</p>}

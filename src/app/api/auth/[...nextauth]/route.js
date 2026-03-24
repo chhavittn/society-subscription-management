@@ -35,7 +35,6 @@ const handler = NextAuth({
 
         const data = await res.json();
 
-        // 👇 store backend token
         if (typeof window !== "undefined") {
           localStorage.setItem("token", data.token);
         }

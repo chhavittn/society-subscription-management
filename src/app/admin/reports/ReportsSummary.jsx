@@ -11,7 +11,6 @@ export default function ReportsSummary() {
     try {
       const token = localStorage.getItem("token")
       if (!token) {
-        console.log("❌ No token found, please login first")
         return
       }
 

@@ -1,132 +1,14 @@
 const { pool } = require("../db");
 
-// exports.makePayment = async (req, res) => {
-//   try {
-//     let { flat_id, plan_id, month, year, payment_mode } = req.body;
-
-//     // 🔹 STEP 1: Get flat_id for user
-//     if (req.user.role !== "admin") {
-//       const flatRes = await pool.query(
-//         "SELECT id FROM flats WHERE user_id=$1 AND is_active=true",
-//         [req.user.id]
-//       );
-
-//       if (!flatRes.rows[0]) {
-//         return res.status(404).json({
-//           success: false,
-//           message: "No flat assigned to this user",
-//         });
-//       }
-
-//       flat_id = flatRes.rows[0].id;
-//     }
-
-//     // 🔹 STEP 2: Validate input
-//     if (!flat_id || !plan_id || !month || !year || !payment_mode) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "All fields are required",
-//       });
-//     }
-
-//     // 🔹 STEP 3: Get plan
-//     const planRes = await pool.query(
-//       "SELECT * FROM subscription_plans WHERE id=$1",
-//       [plan_id]
-//     );
-
-//     if (!planRes.rows[0]) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Plan not found",
-//       });
-//     }
-
-//     const plan = planRes.rows[0];
-
-//     // 🔹 STEP 4: Get or create subscription (NO STATUS UPDATE HERE ❌)
-//     let subRes = await pool.query(
-//       `SELECT * FROM monthly_subscriptions
-//        WHERE flat_id=$1 AND month=$2 AND year=$3`,
-//       [flat_id, month, year]
-//     );
-
-//     let subscription;
-
-//     if (subRes.rows.length === 0) {
-//       const newSub = await pool.query(
-//         `INSERT INTO monthly_subscriptions
-//          (flat_id, plan_id, month, year, amount)
-//          VALUES ($1, $2, $3, $4, $5)
-//          RETURNING *`,
-//         [flat_id, plan_id, month, year, plan.amount]
-//       );
-
-//       subscription = newSub.rows[0];
-//     } else {
-//       subscription = subRes.rows[0];
-//     }
-
-//     // 🔹 STEP 5: UPSERT PAYMENT (VERY IMPORTANT 🔥)
-//     const existingPayment = await pool.query(
-//       `SELECT * FROM payments WHERE subscription_id=$1`,
-//       [subscription.id]
-//     );
-
-//     const transactionId = "TXN" + Date.now();
-
-//     let payment;
-
-//     if (existingPayment.rows.length > 0) {
-//       // ✅ UPDATE existing payment
-//       const updated = await pool.query(
-//         `UPDATE payments
-//          SET status='paid',
-//              payment_mode=$1,
-//              transaction_id=$2,
-//              payment_date=NOW()
-//          WHERE subscription_id=$3
-//          RETURNING *`,
-//         [payment_mode, transactionId, subscription.id]
-//       );
-
-//       payment = updated.rows[0];
-//     } else {
-//       // ✅ INSERT new payment
-//       const inserted = await pool.query(
-//         `INSERT INTO payments
-//          (subscription_id, amount, payment_mode, transaction_id, status)
-//          VALUES ($1, $2, $3, $4, 'paid')
-//          RETURNING *`,
-//         [subscription.id, plan.amount, payment_mode, transactionId]
-//       );
-
-//       payment = inserted.rows[0];
-//     }
-
-//     // 🔹 FINAL RESPONSE
-//     res.status(200).json({
-//       success: true,
-//       message: "Payment successful",
-//       payment,
-//       subscription,
-//     });
-
-//   } catch (error) {
-//     console.error("❌ Payment error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message,
-//     });
-//   }
-// };
-
-
 exports.makePayment = async (req, res) => {
   try {
     let { flat_id, plan_id, month, year, payment_mode } = req.body;
 
-    // 🔹 Get user's flat if not admin
+    plan_id = Number.parseInt(plan_id, 10);
+    month = Number.parseInt(month, 10);
+    year = Number.parseInt(year, 10);
+
+    // Get user's flat if not admin
     if (req.user.role !== "admin") {
       const flatRes = await pool.query(
         "SELECT id FROM flats WHERE user_id=$1 AND is_active=true",
@@ -143,19 +25,40 @@ exports.makePayment = async (req, res) => {
       flat_id = flatRes.rows[0].id;
     }
 
-    // 🔹 Validate input
+    // Validate input
     if (!flat_id || !plan_id || !month || !year || !payment_mode) {
       return res.status(400).json({ success: false, message: "All fields required" });
     }
 
-    // 🔹 Get plan
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      return res.status(400).json({
+        success: false,
+        message: "Month must be between 1 and 12",
+      });
+    }
+
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid year",
+      });
+    }
+
+    if (!["card", "upi", "cash", "admin"].includes(payment_mode)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment mode",
+      });
+    }
+
+    //  Get plan
     const planRes = await pool.query("SELECT * FROM subscription_plans WHERE id=$1", [plan_id]);
     if (!planRes.rows[0])
       return res.status(404).json({ success: false, message: "Plan not found" });
 
     const plan = planRes.rows[0];
 
-    // 🔹 Get or create subscription
+    //  Get or create subscription
     let subRes = await pool.query(
       `SELECT * FROM monthly_subscriptions WHERE flat_id=$1 AND month=$2 AND year=$3`,
       [flat_id, month, year]
@@ -172,7 +75,6 @@ exports.makePayment = async (req, res) => {
       );
       subscription = newSub.rows[0];
     } else {
-      // ✅ Update status to paid
       subscription = subRes.rows[0];
       await pool.query(
         `UPDATE monthly_subscriptions
@@ -182,7 +84,7 @@ exports.makePayment = async (req, res) => {
       );
     }
 
-    // 🔹 Insert or update payment
+    // Insert or update payment
     const transactionId = "TXN" + Date.now();
     await pool.query(
       `INSERT INTO payments
@@ -200,7 +102,7 @@ exports.makePayment = async (req, res) => {
       transaction_id: transactionId,
     });
   } catch (error) {
-    console.error("❌ Payment error:", error);
+    console.error("Payment error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -212,7 +114,6 @@ exports.markSubscriptionPaid = async (req, res) => {
     let subscription;
 
     if (subscription_id) {
-      // ✅ Update existing subscription
       const subRes = await pool.query(
         `UPDATE monthly_subscriptions
          SET status='paid'
@@ -235,7 +136,7 @@ exports.markSubscriptionPaid = async (req, res) => {
         });
       }
 
-      // 🔹 Create if missing, otherwise mark existing row as paid
+      // Create if missing, otherwise mark existing row as paid
       const newSub = await pool.query(
         `INSERT INTO monthly_subscriptions
          (flat_id, plan_id, month, year, amount, status, due_date)
@@ -255,7 +156,7 @@ exports.markSubscriptionPaid = async (req, res) => {
       subscription = newSub.rows[0];
     }
 
-    // 🔹 Also insert a payment record for admin action
+    // Also insert a payment record for admin action
     await pool.query(
       `INSERT INTO payments
        (subscription_id, amount, payment_mode, transaction_id, status, payment_date)
@@ -272,7 +173,7 @@ exports.markSubscriptionPaid = async (req, res) => {
       transaction_id: transactionId,
     });
   } catch (error) {
-    console.error("❌ Admin markPaid error:", error);
+    console.error("Admin markPaid error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -340,39 +241,6 @@ exports.getUserPayments = async (req, res, next) => {
     payments: result.rows
   });
 };
-exports.getSinglePayment = (async (req, res, next) => {
-
-  const result = await pool.query(`
-    SELECT p.*, ms.month, ms.year, f.flat_number, u.id as user_id
-    FROM payments p
-    LEFT JOIN monthly_subscriptions ms ON p.subscription_id = ms.id
-    LEFT JOIN flats f ON ms.flat_id = f.id
-    LEFT JOIN users u ON f.user_id = u.id
-    WHERE p.id=$1
-  `, [req.params.id]);
-
-  const payment = result.rows[0];
-
-  if (!payment) {
-    return res.status(404).json({
-      success: false,
-      message: "Payment not found"
-    });
-  }
-
-  if (req.user.role !== "admin" && payment.user_id !== req.user.id) {
-    return res.status(403).json({
-      success: false,
-      message: "UAccess denied"
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    payment
-  });
-
-});
 
 exports.mypendingpayment = async (req, res) => {
   try {
@@ -381,7 +249,7 @@ exports.mypendingpayment = async (req, res) => {
     const month = today.getMonth() + 1;
     const year = today.getFullYear();
 
-    // 1️⃣ Get the user's flat
+    // Get the user's flat
     const flatRes = await pool.query(
       `SELECT f.id, f.flat_type, f.flat_number
        FROM flats f
@@ -394,7 +262,7 @@ exports.mypendingpayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "User has no assigned flat" });
     }
 
-    // 2️⃣ Get the plan for that flat type
+    // Get the plan for that flat type
     const planRes = await pool.query(
       `SELECT *
        FROM subscription_plans
@@ -410,7 +278,7 @@ exports.mypendingpayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Plan not found for this flat type" });
     }
 
-    // 3️⃣ Check if subscription/payment exists for this month
+    //Check if subscription/payment exists for this month
     let subRes = await pool.query(
       `SELECT ms.*, p.status AS payment_status
        FROM monthly_subscriptions ms
@@ -453,11 +321,11 @@ exports.mypendingpayment = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Pending payment error:", error);
+    console.error(" Pending payment error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
-// controllers/reportsController.js
+
 exports.getReports = async (req, res, next) => {
   try {
     // Fetch all payments and flats
@@ -481,13 +349,10 @@ exports.getReports = async (req, res, next) => {
 
     const paidFlatsSet = new Set();
 
-    // Loop through payments and calculate correctly
     payments.forEach(p => {
-      // Ensure amount is a number
       const amt = parseFloat(p.amount) || 0;
       expectedRevenue += amt;
 
-      // Status may be string or boolean
       const status = (p.status || "").toLowerCase();
       const isPaid = status === "paid" || status === "success" || p.is_paid === true;
 

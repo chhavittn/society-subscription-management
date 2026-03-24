@@ -1,4 +1,3 @@
-// PaymentEntryPage.jsx
 import PaymentEntryForm from "./PaymentEntryForm";
 
 export default function PaymentEntryPage() {

@@ -82,7 +82,6 @@ function downloadCSV(rows, fileName, title) {
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
-  toast.success("CSV downloaded")
 }
 
 export default function DownloadButtons() {
@@ -199,39 +198,46 @@ export default function DownloadButtons() {
   const handlePrintMonthly = useReactToPrint({
     contentRef: monthlyPrintRef,
     documentTitle: `monthly-report-${selectedYear || "year"}-till-${selectedMonth || "month"}`,
-    onAfterPrint: () => {
-      toast.success("PDF saved successfully")
-    },
   })
 
   const handlePrintYearly = useReactToPrint({
     contentRef: yearlyPrintRef,
     documentTitle: `yearly-report-${selectedYear || "year"}`,
-    onAfterPrint: () => {
-      toast.success("PDF saved successfully")
-    },
   })
 
-  const onDownloadMonthlyPdf = () => {
+  const onDownloadMonthlyPdf = async () => {
     if (!monthlyRows.length) {
       toast.error("No data to download")
       return
     }
 
-    handlePrintMonthly()
+    await handlePrintMonthly()
   }
 
-  const onDownloadYearlyPdf = () => {
+  const onDownloadYearlyPdf = async () => {
     if (!yearlyRows.length) {
       toast.error("No data to download")
       return
     }
 
-    handlePrintYearly()
+    await handlePrintYearly()
   }
 
   return (
     <div className="admin-card p-6 space-y-6">
+      <div className="absolute left-[-9999px] top-0">
+        <PrintableReport
+          ref={monthlyPrintRef}
+          title={monthlyTitle}
+          rows={monthlyRows}
+        />
+        <PrintableReport
+          ref={yearlyPrintRef}
+          title={yearlyTitle}
+          rows={yearlyRows}
+        />
+      </div>
+
       <div className="flex flex-wrap gap-3 items-center">
         <label className="text-sm font-semibold text-[#2d3436]">
           Year:

@@ -13,7 +13,7 @@ export function PaymentModeChart() {
   async function fetchPaymentModes() {
     try {
       const token = localStorage.getItem("token")
-      if (!token) return console.log("❌ No token found")
+      if (!token) return;
 
       const allPayments = []
       let page = 1

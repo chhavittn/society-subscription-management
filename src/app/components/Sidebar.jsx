@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 import { loadUser } from "@/redux/slices/authSlice";
 import AdminSidebar from "./AdminSidebar";
 import UserSidebar from "./UserSidebar";
-import ProtectedRoute from "./ProtectedRoute";
 
 export default function Sidebar({ onNavigate }) {
   const router = useRouter();

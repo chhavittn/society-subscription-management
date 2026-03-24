@@ -30,7 +30,6 @@ export default function MonthlyRecordsTable() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // 🔹 Debounce Search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -39,7 +38,6 @@ export default function MonthlyRecordsTable() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // 🔹 Fetch Data
   const fetchRecords = useCallback(async () => {
     try {
       setLoading(true);
@@ -70,7 +68,6 @@ export default function MonthlyRecordsTable() {
     fetchRecords();
   }, [fetchRecords]);
 
-  // 🔹 Apply Search Filter
   useEffect(() => {
     const filtered = records.filter(r =>
       r.user_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
@@ -80,7 +77,6 @@ export default function MonthlyRecordsTable() {
     setFilteredRecords(filtered);
   }, [records, debouncedSearch]);
 
-  // 🔹 Pagination Logic
   const totalPages = Math.ceil(filteredRecords.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const currentData = filteredRecords.slice(
@@ -88,7 +84,6 @@ export default function MonthlyRecordsTable() {
     startIndex + rowsPerPage
   );
 
-  // 🔹 Mark Paid
   const markAsPaid = async (record) => {
     const toastId = toast.loading("Marking payment as paid...");
 

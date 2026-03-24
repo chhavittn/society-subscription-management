@@ -1,9 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const { isAuthenticatedUser, authorizeRoles } = require("../middleware/auth");
-const { makePayment, getUserPayments, getSinglePayment, getAllPayments, getReports, mypendingpayment, markSubscriptionPaid  } = require("../controllers/paymentController");
+const { makePayment, getUserPayments, getAllPayments, getReports, mypendingpayment, markSubscriptionPaid  } = require("../controllers/paymentController");
 
-// User
 router.post(
   "/pay",
   isAuthenticatedUser,
@@ -11,7 +10,6 @@ router.post(
 );
 
 
-// Admin
 router.get(
   "/admin/payments",
   isAuthenticatedUser,
@@ -19,7 +17,6 @@ router.get(
   getAllPayments
 );
 
-// Admin
 router.post(
   "/admin/mark-paid",
   isAuthenticatedUser,
@@ -40,14 +37,6 @@ router.get(
   mypendingpayment
 );
 
-
-router.get(
-  "/payment/:id",
-  isAuthenticatedUser,
- getSinglePayment
-);
-
-// routes/adminRoutes.js
 router.get("/admin/reports", isAuthenticatedUser, authorizeRoles("admin"), getReports);
 
 

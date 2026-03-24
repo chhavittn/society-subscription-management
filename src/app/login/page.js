@@ -101,9 +101,6 @@ export default function LoginPage() {
           <CardTitle className="text-3xl font-bold tracking-tight text-[#2d3436] sm:text-4xl">
             Sign in to your dashboard
           </CardTitle>
-          <p className="text-sm leading-6 text-[#636e72]">
-            Continue with email and password or use your Google account to reach the admin workspace.
-          </p>
         </CardHeader>
 
         <CardContent className="px-6 pb-8 pt-6 sm:px-8">
@@ -158,16 +155,6 @@ export default function LoginPage() {
             </svg>
             Continue with Google
           </Button>
-
-          <p className="mt-6 text-center text-sm text-[#636e72]">
-            Need help accessing the portal? Contact your society admin.
-          </p>
-
-          <div className="mt-4 text-center">
-            <Link href="/" className="text-sm font-medium text-[#0984e3] hover:text-[#00b894]">
-              Back to home
-            </Link>
-          </div>
         </CardContent>
       </Card>
     </div>

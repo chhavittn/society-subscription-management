@@ -6,7 +6,6 @@ exports.addPlan = async (req, res, next) => {
 
     const ALLOWED_FLAT_TYPES = ["1BHK", "2BHK", "3BHK", "4BHK"];
 
-    // ✅ Validation
     if (!plan_name || !amount || !effective_from) {
       return res.status(400).json({
         success: false,
@@ -28,7 +27,6 @@ exports.addPlan = async (req, res, next) => {
       });
     }
 
-    // ✅ Prevent duplicate entry for same date
     const existing = await pool.query(
       `SELECT * FROM subscription_plans 
        WHERE plan_name=$1 AND effective_from=$2`,
@@ -42,7 +40,6 @@ exports.addPlan = async (req, res, next) => {
       });
     }
 
-    // ✅ Insert new rate (history preserved)
     const result = await pool.query(
       `INSERT INTO subscription_plans 
         (plan_name, amount, duration_months, effective_from)
@@ -61,51 +58,6 @@ exports.addPlan = async (req, res, next) => {
     next(error);
   }
 };
-exports.getPlans = async (req, res, next) => {
-  try {
-    const result = await pool.query(`
-      SELECT DISTINCT ON (plan_name)
-        id,
-        plan_name AS flat_type,
-        amount,
-        effective_from
-      FROM subscription_plans
-      ORDER BY plan_name, effective_from DESC
-    `);
-
-    res.status(200).json({
-      success: true,
-      plans: result.rows
-    });
-
-  } catch (error) {
-    next(error);
-  }
-};
-// exports.getPlanByFlatType = async (req, res) => {
-//   const { flat_type } = req.params;
-
-//   const result = await pool.query(
-//     `SELECT * FROM subscription_plans 
-//      WHERE plan_name=$1 
-//      ORDER BY effective_from DESC LIMIT 1`,
-//     [flat_type]
-//   );
-
-//   if (result.rows.length === 0) {
-//     return res.status(404).json({
-//       success: false,
-//       message: "Flat type not found"
-//     });
-//   }
-
-//   res.status(200).json({
-//     success: true,
-//     plan: result.rows[0]
-//   });
-// };
-
-
 exports.getPlanByFlatType = async (req, res) => {
   try {
     const { flat_type } = req.params;

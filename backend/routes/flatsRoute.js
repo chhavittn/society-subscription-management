@@ -1,7 +1,7 @@
 const express = require("express");
 
 const router = express.Router();
-const { addFlat, getAllFlats, getSingleFlat, updateFlat, deleteFlat, getUserFlats
+const { addFlat, getAllFlats, updateFlat, deleteFlat, getUserFlats
 } = require("../controllers/flatsController");
 const { isAuthenticatedUser, authorizeRoles } = require("../middleware/auth");
 
@@ -19,12 +19,6 @@ router.route("/flats").get(
     isAuthenticatedUser,
     authorizeRoles("admin"),
     getAllFlats
-);
-
-router.route("/flat/:id").get(
-    isAuthenticatedUser,
-    authorizeRoles("admin"),
-    getSingleFlat
 );
 
 router.route("/admin/flat/:id").put(
