@@ -213,112 +213,109 @@ exports.getUserFlats = (async (req, res, next) => {
     flats
   });
 });
-exports.updateFlat = async (req, res, next) => {
-  const normalizedPayload = normalizeFlatPayload(req.body);
-  const {
-    flat_number,
-    block,
-    floor,
-    flat_type,
-    name,
-    email,
-    phone,
-  } = normalizedPayload;
-  const { is_active } = req.body;
+exports.updateFlat = async (req, res) => {
+  try {
+    const data = normalize(req.body);
+    const { flat_number, block, floor, flat_type, name, email, phone } = data;
+    const { is_active } = req.body;
 
-  const validationError = validateFlatPayload(normalizedPayload);
-  if (validationError) {
-    return res.status(400).json({
-      success: false,
-      message: validationError,
-    });
-  }
-
-  const flatRes = await pool.query(
-    `SELECT * FROM flats WHERE id=$1`,
-    [req.params.id]
-  );
-
-  const flat = flatRes.rows[0];
-
-  if (!flat) {
-    return res.status(404).json({
-      success: false,
-      message: "Flat not found",
-    });
-  }
-
-  const duplicateFlat = await pool.query(
-    "SELECT id FROM flats WHERE flat_number=$1 AND id <> $2",
-    [flat_number, req.params.id]
-  );
-
-  if (duplicateFlat.rows.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: "Flat number already exists",
-    });
-  }
-
-  let userId = flat.user_id;
-
-  if (userId) {
-    const existingUserByEmail = await pool.query(
-      "SELECT id FROM users WHERE email=$1 AND id <> $2",
-      [email, userId]
-    );
-
-    if (email && existingUserByEmail.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "User already exists with this email",
-      });
+    // Validate
+    const error = validate(data);
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
     }
 
-    await pool.query(
-      `UPDATE users
-       SET name=$1, email=$2, phone=$3
-       WHERE id=$4`,
-      [name, email, phone, userId]
-    );
-  }
-  else if (name && email) {
-    const existingUser = await pool.query(
-      "SELECT id FROM users WHERE email=$1",
-      [email]
+    // Check flat exists
+    const { rows } = await pool.query(
+      "SELECT * FROM flats WHERE id=$1",
+      [req.params.id]
     );
 
-    if (existingUser.rows.length > 0) {
-      userId = existingUser.rows[0].id;
-    } else {
-      const defaultPassword = "123456";
-      const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+    const flat = rows[0];
+    if (!flat) {
+      return res.status(404).json({ success: false, message: "Flat not found" });
+    }
 
-      const userRes = await pool.query(
-        `INSERT INTO users (name, email, password, phone)
-         VALUES ($1,$2,$3,$4)
-         RETURNING id`,
-        [name, email, hashedPassword, phone || null]
+    // Check duplicate flat number
+    const duplicate = await pool.query(
+      "SELECT 1 FROM flats WHERE flat_number=$1 AND id<>$2",
+      [flat_number, req.params.id]
+    );
+
+    if (duplicate.rows.length) {
+      return res.status(400).json({ success: false, message: "Flat already exists" });
+    }
+
+    let userId = flat.user_id;
+
+    if (userId) {
+      if (email) {
+        const conflict = await pool.query(
+          "SELECT 1 FROM users WHERE email=$1 AND id<>$2",
+          [email, userId]
+        );
+
+        if (conflict.rows.length) {
+          return res.status(400).json({
+            success: false,
+            message: "Email already in use",
+          });
+        }
+      }
+
+      await pool.query(
+        `UPDATE users SET name=$1, email=$2, phone=$3 WHERE id=$4`,
+        [name, email, phone, userId]
       );
 
-      userId = userRes.rows[0].id;
+    } else if (name && email) {
+      const userRes = await pool.query(
+        "SELECT id FROM users WHERE email=$1",
+        [email]
+      );
+
+      if (userRes.rows.length) {
+        userId = userRes.rows[0].id;
+      } else {
+        const hashed = await bcrypt.hash("123456", 10);
+
+        const newUser = await pool.query(
+          `INSERT INTO users (name, email, password, phone)
+           VALUES ($1,$2,$3,$4)
+           RETURNING id`,
+          [name, email, hashed, phone || null]
+        );
+
+        userId = newUser.rows[0].id;
+      }
     }
+    await pool.query(
+      `UPDATE flats
+       SET flat_number=$1, block=$2, floor=$3, flat_type=$4, user_id=$5, is_active=$6
+       WHERE id=$7`,
+      [flat_number, block, floor, flat_type, userId, is_active, req.params.id]
+    );
+
+    // Return updated flat
+    const updated = await pool.query(
+      `SELECT f.*, 
+              u.id AS user_id, u.name AS user_name, u.email AS user_email, u.phone AS user_phone
+       FROM flats f
+       LEFT JOIN users u ON f.user_id = u.id
+       WHERE f.id=$1`,
+      [req.params.id]
+    );
+
+    res.status(200).json({
+      success: true,
+      flat: updated.rows[0],
+    });
+
+  } catch (err) {
+    console.error("UPDATE FLAT ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
-
-  const result = await pool.query(
-    `UPDATE flats 
-     SET flat_number=$1, block=$2, floor=$3, flat_type=$4, user_id=$5, is_active=$6
-     WHERE id=$7
-     RETURNING *`,
-    [flat_number, block, floor, flat_type, userId, is_active, req.params.id]
-  );
-
-  res.status(200).json({
-    success: true,
-    flat: result.rows[0],
-  });
 };
-
 exports.deleteFlat = (async (req, res, next) => {
   const result = await pool.query(
     "DELETE FROM flats WHERE id=$1 RETURNING *",

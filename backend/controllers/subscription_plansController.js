@@ -40,6 +40,7 @@ exports.addPlan = async (req, res, next) => {
       });
     }
 
+    // ✅ Insert new rate (history preserved)
     const result = await pool.query(
       `INSERT INTO subscription_plans 
         (plan_name, amount, duration_months, effective_from)
@@ -54,6 +55,28 @@ exports.addPlan = async (req, res, next) => {
       plan: result.rows[0]
     });
 
+  } catch (error) {
+    next(error);
+  }
+};
+exports.getAllPlans = async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT ON (plan_name)
+          id,
+          plan_name,
+          plan_name AS flat_type,
+          amount,
+          duration_months,
+          effective_from
+       FROM subscription_plans
+       ORDER BY plan_name, effective_from DESC, id DESC`
+    );
+
+    res.status(200).json({
+      success: true,
+      plans: result.rows,
+    });
   } catch (error) {
     next(error);
   }
